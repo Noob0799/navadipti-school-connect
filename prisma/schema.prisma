@@ -1,0 +1,357 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Enums ────────────────────────────────────────────────────────────────
+
+enum Role {
+  PRINCIPAL
+  TEACHER
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// Only one session may be ACTIVE and only one may be UPCOMING at a time.
+// Not enforceable as a plain Prisma unique constraint (it's a partial
+// uniqueness rule, not a full-column one) — enforced in the service layer
+// before create/activate; can be hardened later with a raw partial unique
+// index (`CREATE UNIQUE INDEX ... WHERE status = 'ACTIVE'`) if desired.
+enum SessionStatus {
+  UPCOMING
+  ACTIVE
+  CLOSED
+}
+
+enum TermName {
+  CT1
+  HALF_YEARLY
+  CT2
+  ANNUAL
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  PROMOTED
+  RETAINED
+  GRADUATED
+  WITHDRAWN
+}
+
+// Owner side of a polymorphic association — ownerId is not a DB-level FK,
+// it's resolved against whichever table ownerType points to.
+enum AttachmentOwnerType {
+  SYLLABUS
+  HOMEWORK
+  TEST
+  HOMEWORK_SUBMISSION
+  TEST_SUBMISSION
+}
+
+enum NotificationType {
+  SYLLABUS_CHANGED
+  HOMEWORK_CHANGED
+  TEST_CHANGED
+  GRADES_RELEASED
+  HOMEWORK_REMARK_ADDED
+  ANNOUNCEMENT_PUBLISHED
+}
+
+// ── Identity ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  phoneNumber  String     @unique
+  passwordHash String
+  role         Role
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  teacherProfile TeacherProfile?
+  studentProfile StudentProfile?
+
+  teacherSubjectExpertise TeacherSubjectExpertise[]
+  teacherAssignments      TeacherAssignment[]
+  enrollments             Enrollment[]             @relation("StudentEnrollments")
+
+  syllabiPublished       Syllabus[]           @relation("SyllabusPublishedBy")
+  homeworkCreated        Homework[]           @relation("HomeworkCreatedBy")
+  homeworkSubmissions    HomeworkSubmission[] @relation("HomeworkSubmissionsByStudent")
+  testsCreated           Test[]               @relation("TestCreatedBy")
+  testSubmissions        TestSubmission[]     @relation("TestSubmissionsByStudent")
+  testsGraded            TestSubmission[]     @relation("TestSubmissionsGradedBy")
+  announcementsPublished Announcement[]       @relation("AnnouncementsPublishedBy")
+  attachmentsUploaded    Attachment[]         @relation("AttachmentsUploadedBy")
+  notificationsReceived  Notification[]       @relation("NotificationsForUser")
+  notificationsCreated   Notification[]       @relation("NotificationsCreatedBy")
+  notificationCursor     NotificationCursor?
+}
+
+model TeacherProfile {
+  userId       String  @id
+  user         User    @relation(fields: [userId], references: [id])
+  employeeInfo String?
+}
+
+model StudentProfile {
+  userId   String @id
+  user     User   @relation(fields: [userId], references: [id])
+  schoolId String @unique
+}
+
+// ── Academic structure ──────────────────────────────────────────────────
+
+model SchoolClass {
+  id    String @id @default(cuid())
+  name  String @unique
+  order Int    @unique
+
+  classOfferings ClassOffering[]
+}
+
+model AcademicSession {
+  id        String        @id @default(cuid())
+  label     String        @unique
+  status    SessionStatus @default(UPCOMING)
+  createdAt DateTime      @default(now())
+
+  classOfferings ClassOffering[]
+  terms          Term[]
+}
+
+model ClassOffering {
+  id                String          @id @default(cuid())
+  schoolClassId     String
+  schoolClass       SchoolClass     @relation(fields: [schoolClassId], references: [id])
+  academicSessionId String
+  academicSession   AcademicSession @relation(fields: [academicSessionId], references: [id])
+
+  offeringSubjects OfferingSubject[]
+  enrollments      Enrollment[]
+  notifications    Notification[]
+
+  @@unique([schoolClassId, academicSessionId])
+}
+
+model Term {
+  id                String          @id @default(cuid())
+  academicSessionId String
+  academicSession   AcademicSession @relation(fields: [academicSessionId], references: [id])
+  name              TermName
+
+  syllabi Syllabus[]
+  tests   Test[]
+
+  @@unique([academicSessionId, name])
+}
+
+// Seeded once, fixed: English, Bengali, Mathematics, Drawing,
+// General Knowledge, Science, History, Geography.
+model Subject {
+  id   String @id @default(cuid())
+  name String @unique
+
+  offeringSubjects OfferingSubject[]
+  teacherExpertise TeacherSubjectExpertise[]
+}
+
+model OfferingSubject {
+  id              String        @id @default(cuid())
+  classOfferingId String
+  classOffering   ClassOffering @relation(fields: [classOfferingId], references: [id])
+  subjectId       String
+  subject         Subject       @relation(fields: [subjectId], references: [id])
+
+  teacherAssignment TeacherAssignment?
+  syllabi           Syllabus[]
+  homework          Homework[]
+  tests             Test[]
+
+  @@unique([classOfferingId, subjectId])
+}
+
+// Standing capability, independent of any session — gates TeacherAssignment.
+model TeacherSubjectExpertise {
+  id        String  @id @default(cuid())
+  teacherId String
+  teacher   User    @relation(fields: [teacherId], references: [id])
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([teacherId, subjectId])
+}
+
+// One teacher per offering-subject (no co-teaching), validated against
+// TeacherSubjectExpertise at the application layer on create.
+model TeacherAssignment {
+  id                String          @id @default(cuid())
+  teacherId         String
+  teacher           User            @relation(fields: [teacherId], references: [id])
+  offeringSubjectId String          @unique
+  offeringSubject   OfferingSubject @relation(fields: [offeringSubjectId], references: [id])
+}
+
+model Enrollment {
+  id              String           @id @default(cuid())
+  studentId       String
+  student         User             @relation("StudentEnrollments", fields: [studentId], references: [id])
+  classOfferingId String
+  classOffering   ClassOffering    @relation(fields: [classOfferingId], references: [id])
+  status          EnrollmentStatus @default(ENROLLED)
+  createdAt       DateTime         @default(now())
+
+  @@unique([studentId, classOfferingId])
+}
+
+// ── Coursework ───────────────────────────────────────────────────────────
+
+model Syllabus {
+  id                String          @id @default(cuid())
+  offeringSubjectId String
+  offeringSubject   OfferingSubject @relation(fields: [offeringSubjectId], references: [id])
+  termId            String
+  term              Term            @relation(fields: [termId], references: [id])
+  content           String
+  publishedById     String
+  publishedBy       User            @relation("SyllabusPublishedBy", fields: [publishedById], references: [id])
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([offeringSubjectId, termId])
+}
+
+model Homework {
+  id                String   @id @default(cuid())
+  offeringSubjectId String
+  offeringSubject   OfferingSubject @relation(fields: [offeringSubjectId], references: [id])
+  title             String
+  description       String
+  deadlineDate      DateTime
+  createdById       String
+  createdBy         User     @relation("HomeworkCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  submissions HomeworkSubmission[]
+}
+
+model HomeworkSubmission {
+  id            String   @id @default(cuid())
+  homeworkId    String
+  homework      Homework @relation(fields: [homeworkId], references: [id])
+  studentId     String
+  student       User     @relation("HomeworkSubmissionsByStudent", fields: [studentId], references: [id])
+  submittedAt   DateTime @default(now())
+  teacherRemark String?
+
+  @@unique([homeworkId, studentId])
+}
+
+// max/pass marks are derived from `term.name` via a fixed constant in
+// application code (CT1/CT2: 25/10, HALF_YEARLY/ANNUAL: 50/20) — not stored.
+model Test {
+  id                String   @id @default(cuid())
+  offeringSubjectId String
+  offeringSubject   OfferingSubject @relation(fields: [offeringSubjectId], references: [id])
+  termId            String
+  term              Term     @relation(fields: [termId], references: [id])
+  title             String
+  deadlineDate      DateTime
+  createdById       String
+  createdBy         User     @relation("TestCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  submissions TestSubmission[]
+
+  @@unique([offeringSubjectId, termId])
+}
+
+model TestSubmission {
+  id            String    @id @default(cuid())
+  testId        String
+  test          Test      @relation(fields: [testId], references: [id])
+  studentId     String
+  student       User      @relation("TestSubmissionsByStudent", fields: [studentId], references: [id])
+  submittedAt   DateTime  @default(now())
+  marksObtained Int?
+  remark        String?
+  gradedById    String?
+  gradedBy      User?     @relation("TestSubmissionsGradedBy", fields: [gradedById], references: [id])
+  gradedAt      DateTime?
+
+  @@unique([testId, studentId])
+}
+
+// ── Files ────────────────────────────────────────────────────────────────
+
+model Attachment {
+  id               String              @id @default(cuid())
+  ownerType        AttachmentOwnerType
+  ownerId          String
+  fileUrl          String
+  originalFilename String
+  uploadedById     String
+  uploadedBy       User                @relation("AttachmentsUploadedBy", fields: [uploadedById], references: [id])
+  uploadedAt       DateTime            @default(now())
+
+  @@index([ownerType, ownerId])
+}
+
+// ── Communication ────────────────────────────────────────────────────────
+
+model Announcement {
+  id            String   @id @default(cuid())
+  title         String
+  body          String
+  publishedById String
+  publishedBy   User     @relation("AnnouncementsPublishedBy", fields: [publishedById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Exactly one of classOfferingId / userId should be set; neither set means
+// school-wide. Recipients are resolved dynamically (enrollment/assignment
+// membership), never fanned out into per-recipient rows.
+model Notification {
+  id              String           @id @default(cuid())
+  type            NotificationType
+  referenceId     String?
+  message         String
+  classOfferingId String?
+  classOffering   ClassOffering?   @relation(fields: [classOfferingId], references: [id])
+  userId          String?
+  user            User?            @relation("NotificationsForUser", fields: [userId], references: [id])
+  createdById     String
+  createdBy       User             @relation("NotificationsCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime         @default(now())
+
+  @@index([classOfferingId])
+  @@index([userId])
+}
+
+// One row per user: "unread" = notifications relevant to them created after
+// lastReadAt. No per-notification read receipts.
+model NotificationCursor {
+  userId     String   @id
+  user       User     @relation(fields: [userId], references: [id])
+  lastReadAt DateTime @default(now())
+}
+
+// Backs concurrency-safe school_id generation: ND-{year}-{sequence}.
+// Incremented via a single atomic upsert (INSERT ... ON CONFLICT DO UPDATE
+// ... RETURNING), not read-then-write, to avoid duplicate IDs under
+// concurrent enrollment.
+model SchoolIdCounter {
+  year         Int @id
+  lastSequence Int @default(0)
+}
