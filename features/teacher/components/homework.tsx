@@ -70,7 +70,7 @@ function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => vo
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField select label="Class and subject" value={offeringSubjectId} onChange={(e) => setOfferingSubjectId(e.target.value)}>
-            {assignments.data?.map((a) => (
+            {(assignments.data ?? []).map((a) => (
               <MenuItem key={a.offeringSubjectId} value={a.offeringSubjectId}>{a.className} · {a.subjectName}</MenuItem>
             ))}
           </TextField>

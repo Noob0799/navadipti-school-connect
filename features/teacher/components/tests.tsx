@@ -68,7 +68,7 @@ function NewTestDialog({ open, onClose }: { open: boolean; onClose: () => void }
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField select label="Class and subject" value={offeringSubjectId} onChange={(e) => setOfferingSubjectId(e.target.value)}>
-            {assignments.data?.map((a) => <MenuItem key={a.offeringSubjectId} value={a.offeringSubjectId}>{a.className} · {a.subjectName}</MenuItem>)}
+            {(assignments.data ?? []).map((a) => <MenuItem key={a.offeringSubjectId} value={a.offeringSubjectId}>{a.className} · {a.subjectName}</MenuItem>)}
           </TextField>
           <TextField select label="Term" value={termName} onChange={(e) => setTermName(e.target.value)}>
             {TERM_NAMES.map((name) => <MenuItem key={name} value={name}>{TERM_SCALE[name].label} (out of {TERM_SCALE[name].max})</MenuItem>)}

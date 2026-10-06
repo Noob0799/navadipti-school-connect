@@ -121,7 +121,7 @@ export function NewStudent() {
           <TextField label="Student's name" value={name} onChange={(e) => setName(e.target.value)} />
           <TextField label="Parent or student phone number" value={phone} onChange={(e) => setPhone(e.target.value)} helperText="10 digits. Used to sign in." />
           <TextField select label="Class" value={classOfferingId} onChange={(e) => setClassOfferingId(e.target.value)} disabled={!offerings.data?.session}>
-            {offerings.data?.classes.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            {(offerings.data?.classes ?? []).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
           </TextField>
           <TextField
             label="Existing school ID (optional)"
