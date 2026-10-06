@@ -39,7 +39,7 @@ export function EditableFiles({ files }: { files: FileRef[] }) {
       {files.map((file) => (
         <Stack key={file.id} direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
           <Button size="small" variant="outlined" href={`/api/attachments/${file.id}`} target="_blank" rel="noreferrer">{file.name}</Button>
-          <Button size="small" color="error" disabled={remove.isPending} onClick={() => remove.mutate(file.id)}>Remove</Button>
+          <Button size="small" variant="outlined" color="error" disabled={remove.isPending} onClick={() => remove.mutate(file.id)}>Remove</Button>
         </Stack>
       ))}
     </Stack>
@@ -56,6 +56,3 @@ export function FilesPreviewList({ files }: { files: FileRef[] }) {
   );
 }
 
-export function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}

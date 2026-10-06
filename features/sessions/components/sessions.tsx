@@ -127,7 +127,7 @@ function ActivateNextCard({ nextLabel, onDone }: { nextLabel: string; onDone: (t
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button variant="outlined" onClick={() => setOpen(false)}>Cancel</Button>
           <Button variant="contained" color="error" disabled={activate.isPending} onClick={() => activate.mutate()}>
             {activate.isPending ? "Switching…" : `Switch to ${nextLabel}`}
           </Button>

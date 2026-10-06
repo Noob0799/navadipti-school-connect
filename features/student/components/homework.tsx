@@ -3,11 +3,8 @@
 import Link from "next/link";
 import { Alert, Button, Card, CardContent, Chip, Skeleton, Stack, Typography } from "@mui/material";
 import { useHomework, useHomeworkList, useSubmitHomework } from "../queries";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { FileLinks, FilePreview, UploadAnswer } from "./files";
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
 export function HomeworkList() {
   const homework = useHomeworkList();
@@ -25,7 +22,7 @@ export function HomeworkList() {
             <Stack direction="row" spacing={2} sx={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}>
               <Stack spacing={0.5}>
                 <Typography variant="h3" sx={{ mb: 0 }}>
-                  <Link href={`/student/homework/${item.id}`} style={{ color: "inherit" }}>{item.title}</Link>
+                  <Link href={`/student/homework/${item.id}`} style={{ color: "inherit", textDecoration: "none" }}>{item.title}</Link>
                 </Typography>
                 <Typography variant="body2" color="text.secondary">{item.subject} · due {formatDate(item.deadlineDate)}</Typography>
               </Stack>
@@ -74,7 +71,7 @@ export function HomeworkDetail({ id }: { id: string }) {
           {item.submission ? (
             <Stack spacing={2} sx={{ mt: 1 }}>
               <Typography variant="body2" color="text.secondary">
-                Last submitted {new Date(item.submission.submittedAt).toLocaleString("en-IN")}
+                Last submitted {formatDateTime(item.submission.submittedAt)}
                 {item.submission.late ? " (after the due date)" : ""}
               </Typography>
               <FileLinks files={item.submission.files} removable />
@@ -99,7 +96,7 @@ export function HomeworkDetail({ id }: { id: string }) {
         </Card>
       )}
 
-      <Button component={Link} href="/student/homework" sx={{ alignSelf: "flex-start" }}>Back to homework</Button>
+      <Button component={Link} href="/student/homework" variant="outlined" sx={{ alignSelf: "flex-start" }}>Back to homework</Button>
     </Stack>
   );
 }

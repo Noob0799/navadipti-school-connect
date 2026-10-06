@@ -30,7 +30,7 @@ export type TestItem = {
 
 export type SyllabusSubject = {
   subject: string;
-  terms: { termName: string; termLabel: string; syllabus: { content: string; updatedAt: string } | null }[];
+  terms: { termName: string; termLabel: string; syllabus: { content: string; updatedAt: string; files: FileRef[] } | null }[];
 };
 
 export type ResultSubject = {

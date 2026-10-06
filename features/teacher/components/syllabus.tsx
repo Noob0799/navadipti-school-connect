@@ -34,6 +34,7 @@ function TermEditor({ offeringSubjectId, term }: { offeringSubjectId: string; te
   const save = useSaveSyllabus();
   const [content, setContent] = useState(term.content);
   const [saved, setSaved] = useState(false);
+  const [missing, setMissing] = useState(false);
 
   return (
     <Stack spacing={1.5}>
@@ -42,13 +43,18 @@ function TermEditor({ offeringSubjectId, term }: { offeringSubjectId: string; te
         <Chip size="small" label={term.exists ? "Published" : "Not published"} color={term.exists ? "success" : "default"} />
       </Stack>
       {save.isError && <Alert severity="error">{save.error.message}</Alert>}
+      {missing && <Alert severity="error" onClose={() => setMissing(false)}>Write the syllabus before publishing.</Alert>}
       {saved && <Alert severity="success" onClose={() => setSaved(false)}>Saved. The class has been notified.</Alert>}
       <TextField multiline minRows={3} label="Syllabus" value={content} onChange={(e) => setContent(e.target.value)} />
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
         <Button
           variant="contained"
-          disabled={save.isPending || content.trim() === ""}
-          onClick={() => save.mutate({ offeringSubjectId, termName: term.termName, content }, { onSuccess: () => setSaved(true) })}
+          disabled={save.isPending}
+          onClick={() => {
+            if (content.trim() === "") return setMissing(true);
+            setMissing(false);
+            save.mutate({ offeringSubjectId, termName: term.termName, content }, { onSuccess: () => setSaved(true) });
+          }}
         >
           {save.isPending ? "Saving…" : term.exists ? "Save changes" : "Publish syllabus"}
         </Button>

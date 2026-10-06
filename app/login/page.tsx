@@ -29,7 +29,7 @@ export default function LoginPage() {
         </Typography>
         <Box>
           <Typography variant="h2" sx={{ fontSize: { xs: 36, md: 56 }, lineHeight: 1, letterSpacing: "-0.025em" }}>
-            Class is in session. Everything in one place.
+            One place for every class, every day.
           </Typography>
           <Box component="svg" viewBox="0 0 320 20" sx={{ width: 300, maxWidth: "80%", mt: 2 }} aria-hidden="true">
             <path d="M4 13 C 70 2, 130 21, 190 9 S 290 5, 316 11" fill="none" stroke="#F4B73E" strokeWidth="5" strokeLinecap="round" />

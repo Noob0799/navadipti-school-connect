@@ -13,6 +13,7 @@ export type TeacherHomeworkRow = {
   deadlineDate: string;
   subject: string;
   className: string;
+  expectedCount: number;
   submittedCount: number;
   pendingRemarkCount: number;
 };
@@ -49,6 +50,7 @@ export type TeacherTestRow = {
   max: number;
   subject: string;
   className: string;
+  expectedCount: number;
   answeredCount: number;
   ungradedCount: number;
 };
@@ -94,6 +96,7 @@ export function useTeacherPending() {
       apiRequest<{
         homework: { id: string; title: string; subject: string; className: string; pending: number }[];
         tests: { id: string; title: string; subject: string; className: string; termLabel: string; pending: number }[];
+        syllabus: { offeringSubjectId: string; className: string; subject: string; pending: number }[];
       }>("/api/dashboard/teacher/pending"),
   });
 }

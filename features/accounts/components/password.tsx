@@ -43,7 +43,7 @@ export function ResetPasswordButton({ userId, name }: { userId: string; name: st
             <Button variant="contained" onClick={close}>Done</Button>
           ) : (
             <>
-              <Button onClick={close}>Cancel</Button>
+              <Button variant="outlined" onClick={close}>Cancel</Button>
               <Button variant="contained" color="warning" disabled={reset.isPending} onClick={() => reset.mutate()}>
                 {reset.isPending ? "Resetting…" : "Reset password"}
               </Button>

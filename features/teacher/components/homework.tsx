@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Alert, Button, Card, CardContent, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Skeleton, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import type { FileRef } from "@/features/student/queries";
 import { FileLinks, FilePreview } from "@/features/student/components/files";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useAssignments, useCreateHomework, useSaveRemark, useTeacherHomework, useTeacherHomeworkList, useUpdateHomework } from "../queries";
-import { EditableFiles, TeacherUpload, formatDate } from "./common";
+import { EditableFiles, TeacherUpload } from "./common";
 
 export function TeacherHomeworkList() {
   const list = useTeacherHomeworkList();
@@ -27,11 +28,13 @@ export function TeacherHomeworkList() {
           <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
             <Stack>
               <Typography variant="h3" sx={{ mb: 0 }}>
-                <Link href={`/teacher/homework/${h.id}`} style={{ color: "inherit" }}>{h.title}</Link>
+                <Link href={`/teacher/homework/${h.id}`} style={{ color: "inherit", textDecoration: "none" }}>{h.title}</Link>
               </Typography>
               <Typography variant="body2" color="text.secondary">{h.className} · {h.subject} · due {formatDate(h.deadlineDate)}</Typography>
             </Stack>
-            <Typography variant="body2">{h.submittedCount} submitted · {h.pendingRemarkCount} to remark</Typography>
+            <Typography variant="body2">
+              {h.submittedCount}/{h.expectedCount} submitted · {h.submittedCount === 0 ? "N/A" : h.pendingRemarkCount} to remark
+            </Typography>
           </CardContent>
         </Card>
       ))}
@@ -51,6 +54,7 @@ function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
   function save() {
     setError(null);
+    if (!offeringSubjectId || !title || !deadlineDate) return setError("Choose a class, add a title and set a due date.");
     create.mutate(
       { offeringSubjectId, title, description, deadlineDate },
       {
@@ -80,8 +84,8 @@ function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => vo
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={save} disabled={create.isPending || !offeringSubjectId || !title || !deadlineDate}>
+        <Button variant="outlined" onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={save} disabled={create.isPending}>
           {create.isPending ? "Posting…" : "Post to class"}
         </Button>
       </DialogActions>
@@ -89,7 +93,7 @@ function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => vo
   );
 }
 
-export function TeacherHomeworkDetail({ id, readOnly = false }: { id: string; readOnly?: boolean }) {
+export function TeacherHomeworkDetail({ id, readOnly = false, backHref = "/teacher/homework" }: { id: string; readOnly?: boolean; backHref?: string }) {
   const homework = useTeacherHomework(id);
   const update = useUpdateHomework(id);
   const [review, setReview] = useState<string | null>(null);
@@ -99,6 +103,7 @@ export function TeacherHomeworkDetail({ id, readOnly = false }: { id: string; re
   if (homework.isError) return <Alert severity="error">{homework.error.message}</Alert>;
   const item = homework.data;
   const reviewing = item.submissions.find((s) => s.submissionId === review) ?? null;
+  const pendingRemark = item.submissions.filter((s) => s.submitted && !s.remark).length;
 
   return (
     <Stack spacing={3}>
@@ -137,25 +142,61 @@ export function TeacherHomeworkDetail({ id, readOnly = false }: { id: string; re
 
       <Card>
         <CardContent>
+        <Stack direction="row" spacing={2} sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
           <Typography variant="h3">Submissions</Typography>
-          <Stack divider={<div style={{ borderTop: "1px solid #e3e8f0" }} />}>
-            {item.submissions.map((s) => (
-              <Stack key={s.studentId} direction="row" spacing={2} sx={{ py: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-                <Stack>
-                  <Typography sx={{ fontWeight: 700 }}>{s.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">{s.schoolId}{s.submitted ? ` · submitted ${new Date(s.submittedAt!).toLocaleDateString("en-IN")}${s.late ? " (late)" : ""}` : " · not submitted"}</Typography>
-                  {s.remark && <Typography variant="body2">Remark: {s.remark}</Typography>}
-                </Stack>
-                <Button size="small" variant="outlined" disabled={!s.submitted} onClick={() => setReview(s.submissionId)}>{readOnly ? "View" : "Review"}</Button>
-              </Stack>
-            ))}
-          </Stack>
+          {item.submissions.some((s) => s.submitted)
+            ? <Chip size="small" color={pendingRemark ? "warning" : "success"} label={`${pendingRemark} to remark`} />
+            : <Chip size="small" label="N/A to remark" />}
+        </Stack>
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Student</TableCell>
+                <TableCell>School ID</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Submitted on</TableCell>
+                <TableCell>Remark</TableCell>
+                <TableCell>Action</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {item.submissions.map((s) => (
+                <TableRow key={s.studentId} hover>
+                  <TableCell sx={{ fontWeight: 700 }}>{s.name}</TableCell>
+                  <TableCell sx={{ fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>{s.schoolId}</TableCell>
+                  <TableCell>
+                    {!s.submitted
+                      ? <Chip size="small" label="Not submitted" />
+                      : <Chip size="small" color={s.late ? "warning" : "success"} label={s.late ? "Late" : "Submitted"} />}
+                  </TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{s.submittedAt ? formatDateTime(s.submittedAt) : "–"}</TableCell>
+                  <TableCell>{s.remark || "–"}</TableCell>
+                  <TableCell>
+                    <Button size="small" variant="outlined" disabled={!s.submitted} onClick={() => setReview(s.submissionId)}>{readOnly ? "View" : "Review"}</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
         </CardContent>
       </Card>
 
-      <Button component={Link} href="/teacher/homework" sx={{ alignSelf: "flex-start" }}>Back to homework</Button>
+      <Button component={Link} href={backHref} variant="outlined" sx={{ alignSelf: "flex-start" }}>Back to homework</Button>
 
-      <ReviewDialog readOnly={readOnly} open={reviewing !== null} files={reviewing?.files ?? []} studentName={reviewing?.name ?? ""} submissionId={reviewing?.submissionId ?? ""} initialRemark={reviewing?.remark ?? ""} onClose={() => setReview(null)} />
+      {reviewing && (
+        <ReviewDialog
+          key={reviewing.submissionId}
+          readOnly={readOnly}
+          open
+          files={reviewing.files}
+          studentName={reviewing.name}
+          submissionId={reviewing.submissionId ?? ""}
+          initialRemark={reviewing.remark}
+          onClose={() => setReview(null)}
+        />
+      )}
     </Stack>
   );
 }
@@ -194,7 +235,7 @@ function ReviewDialog({ open, files, studentName, submissionId, initialRemark, o
                 ))}
               </Stack>
             )}
-            {file ? <FilePreview file={file} /> : <Typography color="text.secondary">No file uploaded.</Typography>}
+            {file ? <FilePreview file={file} /> : <Typography color="text.secondary">No file was attached to this submission.</Typography>}
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <Stack spacing={2}>
@@ -206,7 +247,7 @@ function ReviewDialog({ open, files, studentName, submissionId, initialRemark, o
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button variant="outlined" onClick={onClose}>Close</Button>
         {!readOnly && (
           <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate({ submissionId, remark }, { onSuccess: onClose })}>
             {save.isPending ? "Saving…" : "Save remark"}

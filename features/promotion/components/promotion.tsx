@@ -62,8 +62,9 @@ function ClassReview({ classOfferingId }: { classOfferingId: string }) {
 
 function ReviewTable({ review }: { review: Review }) {
   const queryClient = useQueryClient();
+  const isComplete = (s: Review["students"][number]) => s.subjects.every((sub) => sub.allGraded);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(
-    review.students.filter((s) => s.subjects.length > 0 && s.subjects.every((sub) => sub.passed)).map((s) => s.id),
+    review.students.filter((s) => isComplete(s) && s.subjects.every((sub) => sub.passed)).map((s) => s.id),
   ));
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -94,8 +95,9 @@ function ReviewTable({ review }: { review: Review }) {
     });
   }
 
-  const promotedCount = review.students.filter((s) => selected.has(s.id)).length;
-  const retainedCount = review.students.length - promotedCount;
+  const decidable = review.students.filter(isComplete);
+  const promotedCount = decidable.filter((s) => selected.has(s.id)).length;
+  const retainedCount = decidable.length - promotedCount;
   const nextLabel = review.upcomingSessionLabel;
 
   return (
@@ -103,7 +105,8 @@ function ReviewTable({ review }: { review: Review }) {
       {result && <Alert severity="success" onClose={() => setResult(null)}>{result}</Alert>}
       {!nextLabel && (
         <Alert severity="warning">
-          Create the next session before promoting. <Link href="/principal/sessions">Go to sessions</Link>
+          Create the next session before promoting.{" "}
+          <Link href="/principal/sessions" style={{ fontWeight: 700, textDecoration: "underline" }}>Go to sessions</Link>
         </Alert>
       )}
       {nextLabel && (
@@ -132,10 +135,16 @@ function ReviewTable({ review }: { review: Review }) {
             <TableBody>
               {review.students.map((student) => {
                 const checked = selected.has(student.id);
+                const complete = isComplete(student);
                 return (
                   <TableRow key={student.id} selected={checked}>
                     <TableCell padding="checkbox">
-                      <Checkbox checked={checked} onChange={() => toggle(student.id)} slotProps={{ input: { "aria-label": `Promote ${student.name}` } as React.InputHTMLAttributes<HTMLInputElement> }} />
+                      <Checkbox
+                        checked={checked}
+                        disabled={!complete}
+                        onChange={() => toggle(student.id)}
+                        slotProps={{ input: { "aria-label": `Promote ${student.name}` } as React.InputHTMLAttributes<HTMLInputElement> }}
+                      />
                     </TableCell>
                     <TableCell>
                       <Typography sx={{ fontWeight: 700 }}>{student.name}</Typography>
@@ -150,7 +159,11 @@ function ReviewTable({ review }: { review: Review }) {
                       </TableCell>
                     ))}
                     <TableCell>
-                      <Chip size="small" color={checked ? "success" : "default"} label={checked ? (review.isFinalClass ? "Graduate" : "Promote") : `Repeat ${review.className}`} />
+                      {complete ? (
+                        <Chip size="small" color={checked ? "success" : "default"} label={checked ? (review.isFinalClass ? "Graduate" : "Promote") : `Repeat ${review.className}`} />
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">Awaiting results</Typography>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -162,9 +175,12 @@ function ReviewTable({ review }: { review: Review }) {
 
       {review.students.length > 0 && (
         <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-          <Button variant="contained" disabled={!nextLabel} onClick={() => setConfirming(true)}>
+          <Button variant="contained" disabled={!nextLabel || decidable.length !== review.students.length} onClick={() => setConfirming(true)}>
             Promote {promotedCount}, retain {retainedCount}
           </Button>
+          {decidable.length !== review.students.length && (
+            <Typography variant="body2" color="text.secondary">Promotion unlocks once every student&apos;s results are in.</Typography>
+          )}
         </Stack>
       )}
 
@@ -177,7 +193,7 @@ function ReviewTable({ review }: { review: Review }) {
           {promote.isError && <Alert severity="error" sx={{ mt: 2 }}>{promote.error.message}</Alert>}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirming(false)}>Cancel</Button>
+          <Button variant="outlined" onClick={() => setConfirming(false)}>Cancel</Button>
           <Button variant="contained" disabled={promote.isPending} onClick={() => promote.mutate()}>
             {promote.isPending ? "Promoting…" : "Confirm"}
           </Button>

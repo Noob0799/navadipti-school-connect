@@ -39,29 +39,33 @@ export function ClassAssignments() {
                 const experts = activeTeachers.filter((t) => t.subjects.some((s) => s.id === subject.subjectId));
                 const assignedId = subject.teacher?.id ?? "";
                 return (
-                  <TextField
-                    key={subject.offeringSubjectId}
-                    select
-                    size="small"
-                    label={subject.subjectName}
-                    value={assignedId}
-                    disabled={assign.isPending}
-                    helperText={experts.length === 0 ? "No active teacher is an expert in this subject yet." : undefined}
-                    onChange={(event) =>
-                      assign.mutate({
-                        offeringSubjectId: subject.offeringSubjectId,
-                        teacherId: event.target.value || null,
-                      })
-                    }
-                  >
-                    <MenuItem value="">Not assigned</MenuItem>
-                    {experts.map((teacher) => (
-                      <MenuItem key={teacher.id} value={teacher.id}>{teacher.name}</MenuItem>
-                    ))}
-                    {subject.teacher && !experts.some((t) => t.id === subject.teacher?.id) && (
-                      <MenuItem value={subject.teacher.id} disabled>{subject.teacher.name} (no longer an expert)</MenuItem>
-                    )}
-                  </TextField>
+                  <Stack key={subject.offeringSubjectId} spacing={0.5}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: "text.secondary" }}>
+                      {subject.subjectName}
+                    </Typography>
+                    <TextField
+                      select
+                      size="small"
+                      value={assignedId}
+                      disabled={assign.isPending}
+                      slotProps={{ select: { displayEmpty: true } }}
+                      helperText={experts.length === 0 ? "No active teacher is an expert in this subject yet." : undefined}
+                      onChange={(event) =>
+                        assign.mutate({
+                          offeringSubjectId: subject.offeringSubjectId,
+                          teacherId: event.target.value || null,
+                        })
+                      }
+                    >
+                      <MenuItem value="">Not assigned</MenuItem>
+                      {experts.map((teacher) => (
+                        <MenuItem key={teacher.id} value={teacher.id}>{teacher.name}</MenuItem>
+                      ))}
+                      {subject.teacher && !experts.some((t) => t.id === subject.teacher?.id) && (
+                        <MenuItem value={subject.teacher.id} disabled>{subject.teacher.name} (no longer an expert)</MenuItem>
+                      )}
+                    </TextField>
+                  </Stack>
                 );
               })}
             </Stack>

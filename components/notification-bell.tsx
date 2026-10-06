@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge, Box, IconButton, Paper, Stack, Typography } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import { useMarkNotificationsRead, useNotifications } from "@/features/student/queries";
+import { formatDateTime } from "@/lib/format";
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -34,7 +35,7 @@ export function NotificationBell() {
             {notifications.data?.items.map((item) => (
               <Box key={item.id} sx={{ p: 1, borderRadius: 1, bgcolor: item.isNew ? "action.hover" : "transparent" }}>
                 <Typography variant="body2" sx={{ fontWeight: item.isNew ? 700 : 400 }}>{item.message}</Typography>
-                <Typography variant="caption" color="text.secondary">{new Date(item.createdAt).toLocaleString("en-IN")}</Typography>
+                <Typography variant="caption" color="text.secondary">{formatDateTime(item.createdAt)}</Typography>
               </Box>
             ))}
           </Stack>

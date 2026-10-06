@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { listTeacherHomework, listTeacherTests } from "@/features/teacher/service";
+import { listTeacherHomework, listTeacherTests, syllabusToPublish } from "@/features/teacher/service";
 
 export async function principalTeamOverview() {
   const [teachers, session, unassigned] = await Promise.all([
@@ -19,16 +19,17 @@ export async function principalTeamOverview() {
 
   const teacherRows = await Promise.all(
     teachers.map(async (teacher) => {
-      const [homework, tests] = await Promise.all([listTeacherHomework(teacher.id), listTeacherTests(teacher.id)]);
-      const byClassSubject = new Map<string, { className: string; subject: string; homeworkToRemark: number; testsToGrade: number }>();
+      const [homework, tests, syllabus] = await Promise.all([listTeacherHomework(teacher.id), listTeacherTests(teacher.id), syllabusToPublish(teacher.id)]);
+      const byClassSubject = new Map<string, { className: string; subject: string; homeworkToRemark: number; testsToGrade: number; syllabusToPublish: number }>();
       const entryFor = (className: string, subject: string) => {
         const key = `${className}|${subject}`;
-        const existing = byClassSubject.get(key) ?? { className, subject, homeworkToRemark: 0, testsToGrade: 0 };
+        const existing = byClassSubject.get(key) ?? { className, subject, homeworkToRemark: 0, testsToGrade: 0, syllabusToPublish: 0 };
         byClassSubject.set(key, existing);
         return existing;
       };
       for (const h of homework) entryFor(h.className, h.subject).homeworkToRemark += h.pendingRemarkCount;
       for (const t of tests) entryFor(t.className, t.subject).testsToGrade += t.ungradedCount;
+      for (const s of syllabus) entryFor(s.className, s.subject).syllabusToPublish += s.pending;
 
       const rows = Array.from(byClassSubject.values()).sort((a, b) => a.className.localeCompare(b.className) || a.subject.localeCompare(b.subject));
       return {
@@ -37,6 +38,7 @@ export async function principalTeamOverview() {
         active: teacher.status === "ACTIVE",
         homeworkToRemark: rows.reduce((n, r) => n + r.homeworkToRemark, 0),
         testsToGrade: rows.reduce((n, r) => n + r.testsToGrade, 0),
+        syllabusToPublish: rows.reduce((n, r) => n + r.syllabusToPublish, 0),
         rows,
       };
     }),

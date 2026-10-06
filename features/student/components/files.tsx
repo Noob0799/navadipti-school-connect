@@ -20,7 +20,7 @@ export function FileLinks({ files, removable = false }: { files: FileRef[]; remo
             {file.name}
           </Button>
           {removable && (
-            <Button size="small" color="error" disabled={deleteFile.isPending} onClick={() => deleteFile.mutate(file.id)}>
+            <Button size="small" variant="outlined" color="error" disabled={deleteFile.isPending} onClick={() => deleteFile.mutate(file.id)}>
               Remove
             </Button>
           )}

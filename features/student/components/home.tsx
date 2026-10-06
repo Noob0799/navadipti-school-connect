@@ -2,11 +2,8 @@
 
 import Link from "next/link";
 import { Alert, Button, Card, CardContent, Skeleton, Stack, Typography } from "@mui/material";
+import { formatDate } from "@/lib/format";
 import { usePending } from "../queries";
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-}
 
 export function StudentHome() {
   const pending = usePending();

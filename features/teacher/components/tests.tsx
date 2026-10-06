@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Skeleton, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Grid, MenuItem, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import type { FileRef } from "@/features/student/queries";
 import { FileLinks, FilePreview } from "@/features/student/components/files";
 import { TERM_NAMES, TERM_SCALE } from "@/lib/academic";
 import { useAssignments, useGradeSubmission, useReleaseGrades, useSaveTest, useTeacherTest, useTeacherTestList } from "../queries";
-import { EditableFiles, TeacherUpload, formatDate } from "./common";
+import { formatDate } from "@/lib/format";
+import { EditableFiles, TeacherUpload } from "./common";
 
 export function TeacherTestList() {
   const list = useTeacherTestList();
@@ -28,13 +29,15 @@ export function TeacherTestList() {
           <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
             <Stack>
               <Typography variant="h3" sx={{ mb: 0 }}>
-                <Link href={`/teacher/tests/${t.id}`} style={{ color: "inherit" }}>{t.title}</Link>
+                <Link href={`/teacher/tests/${t.id}`} style={{ color: "inherit", textDecoration: "none" }}>{t.title}</Link>
               </Typography>
               <Typography variant="body2" color="text.secondary">{t.className} · {t.subject} · {t.termLabel} · out of {t.max}</Typography>
             </Stack>
             <Stack direction="row" spacing={1}>
-              <Chip size="small" label={`${t.answeredCount} answered`} />
-              <Chip size="small" color={t.ungradedCount ? "warning" : "success"} label={t.ungradedCount ? `${t.ungradedCount} to grade` : "All graded"} />
+              <Chip size="small" label={`${t.answeredCount}/${t.expectedCount} answered`} />
+              {t.answeredCount === 0
+                ? <Chip size="small" label="N/A to grade" />
+                : <Chip size="small" color={t.ungradedCount ? "warning" : "success"} label={t.ungradedCount ? `${t.ungradedCount} to grade` : "All graded"} />}
             </Stack>
           </CardContent>
         </Card>
@@ -55,6 +58,7 @@ function NewTestDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
   function submit() {
     setError(null);
+    if (!offeringSubjectId || !title || !deadlineDate) return setError("Choose a class, add a title and set a deadline.");
     save.mutate({ offeringSubjectId, termName, title, deadlineDate }, {
       onSuccess: () => { setTitle(""); setDeadlineDate(""); onClose(); },
       onError: (e) => setError(e.message),
@@ -78,8 +82,8 @@ function NewTestDialog({ open, onClose }: { open: boolean; onClose: () => void }
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={save.isPending || !offeringSubjectId || !title || !deadlineDate}>
+        <Button variant="outlined" onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={save.isPending}>
           {save.isPending ? "Saving…" : "Save and notify class"}
         </Button>
       </DialogActions>
@@ -87,7 +91,7 @@ function NewTestDialog({ open, onClose }: { open: boolean; onClose: () => void }
   );
 }
 
-export function TeacherTestDetail({ id, readOnly = false }: { id: string; readOnly?: boolean }) {
+export function TeacherTestDetail({ id, readOnly = false, backHref = "/teacher/tests" }: { id: string; readOnly?: boolean; backHref?: string }) {
   const test = useTeacherTest(id);
   const release = useReleaseGrades();
   const [grading, setGrading] = useState<string | null>(null);
@@ -125,7 +129,9 @@ export function TeacherTestDetail({ id, readOnly = false }: { id: string; readOn
           <Stack direction="row" spacing={2} sx={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
             <Typography variant="h3">Answers</Typography>
             <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <Typography variant="body2" color="text.secondary">{ungraded} to grade</Typography>
+              {item.students.every((s) => !s.answered)
+                ? <Chip size="small" label="N/A to grade" />
+                : <Chip size="small" color={ungraded ? "warning" : "success"} label={`${ungraded} to grade`} />}
               {!readOnly && <Button
                 variant="outlined"
                 disabled={release.isPending}
@@ -138,26 +144,46 @@ export function TeacherTestDetail({ id, readOnly = false }: { id: string; readOn
             </Stack>
           </Stack>
           {message && <Alert severity="success" sx={{ mt: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
-          <Stack divider={<div style={{ borderTop: "1px solid #e3e8f0" }} />} sx={{ mt: 1 }}>
-            {item.students.map((s) => (
-              <Stack key={s.studentId} direction="row" spacing={2} sx={{ py: 1.5, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-                <Stack>
-                  <Typography sx={{ fontWeight: 700 }}>{s.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">{s.schoolId}{s.answered ? "" : " · no answer"}</Typography>
-                </Stack>
-                <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-                  {s.marks !== null && <Chip size="small" color={s.marks >= item.pass ? "success" : "error"} label={`${s.marks}/${item.max} ${s.marks >= item.pass ? "Pass" : "Fail"}`} />}
-                  <Button size="small" variant="outlined" disabled={!s.answered} onClick={() => setGrading(s.submissionId)}>
-                    {readOnly ? "View" : s.marks === null ? "Open and grade" : "Open"}
-                  </Button>
-                </Stack>
-              </Stack>
-            ))}
-          </Stack>
+          <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Student</TableCell>
+                  <TableCell>School ID</TableCell>
+                  <TableCell>Answer</TableCell>
+                  <TableCell>Marks</TableCell>
+                  <TableCell>Result</TableCell>
+                  <TableCell>Remark</TableCell>
+                  <TableCell>Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {item.students.map((s) => (
+                  <TableRow key={s.studentId} hover>
+                    <TableCell sx={{ fontWeight: 700 }}>{s.name}</TableCell>
+                    <TableCell sx={{ fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>{s.schoolId}</TableCell>
+                    <TableCell>{s.answered ? <Chip size="small" color="success" label="Answered" /> : <Chip size="small" label="No answer" />}</TableCell>
+                    <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{s.marks === null ? "–" : `${s.marks}/${item.max}`}</TableCell>
+                    <TableCell>
+                      {s.marks === null
+                        ? (s.answered ? <Chip size="small" color="warning" label="Not graded" /> : "–")
+                        : <Chip size="small" color={s.marks >= item.pass ? "success" : "error"} label={s.marks >= item.pass ? "Pass" : "Fail"} />}
+                    </TableCell>
+                    <TableCell>{s.remark || "–"}</TableCell>
+                    <TableCell>
+                      <Button size="small" variant="outlined" disabled={!s.answered} onClick={() => setGrading(s.submissionId)}>
+                        {readOnly ? "View" : s.marks === null ? "Grade" : "Open"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </CardContent>
       </Card>
 
-      <Button component={Link} href="/teacher/tests" sx={{ alignSelf: "flex-start" }}>Back to tests</Button>
+      <Button component={Link} href={backHref} variant="outlined" sx={{ alignSelf: "flex-start" }}>Back to tests</Button>
 
       <GradeDialog readOnly={readOnly} key={grading ?? "none"} open={active !== null} submissionId={active?.submissionId ?? ""} studentName={active?.name ?? ""} files={active?.files ?? []} max={item.max} initialMarks={active?.marks ?? null} initialRemark={active?.remark ?? ""} onClose={() => setGrading(null)} />
     </Stack>
@@ -208,11 +234,14 @@ function GradeDialog({ open, submissionId, studentName, files, max, initialMarks
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button variant="outlined" onClick={onClose}>Close</Button>
         <Button
           variant="contained"
-          disabled={readOnly || grade.isPending || invalid}
-          onClick={() => grade.mutate({ submissionId, marksObtained: value, remark }, { onSuccess: onClose })}
+          disabled={readOnly || grade.isPending}
+          onClick={() => {
+            if (invalid) return;
+            grade.mutate({ submissionId, marksObtained: value, remark }, { onSuccess: onClose });
+          }}
         >
           {grade.isPending ? "Saving…" : "Save grade"}
         </Button>

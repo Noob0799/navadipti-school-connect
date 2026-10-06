@@ -38,6 +38,22 @@ export function TeacherHome() {
           </Stack>
 
           <Stack spacing={1.5}>
+            <Typography variant="h3">Syllabus to publish</Typography>
+            {pending.data.syllabus.length === 0 && <Typography color="text.secondary">You have no classes this session.</Typography>}
+            {pending.data.syllabus.map((s) => (
+              <Card key={s.offeringSubjectId}>
+                <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                  <Typography sx={{ fontWeight: 700 }}>{s.className} · {s.subject}</Typography>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                    <Chip size="small" color={s.pending ? "warning" : "success"} label={s.pending ? `${s.pending} term${s.pending === 1 ? "" : "s"} to publish` : "All published"} />
+                    <Button component={Link} href="/teacher/syllabus" size="small" variant="outlined">Open</Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+
+          <Stack spacing={1.5}>
             <Typography variant="h3">Tests to grade</Typography>
             {pending.data.tests.length === 0 && <Typography color="text.secondary">Nothing to grade.</Typography>}
             {pending.data.tests.map((t) => (

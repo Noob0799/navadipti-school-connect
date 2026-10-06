@@ -30,14 +30,14 @@ export function StudentList() {
                 <TableCell>School ID</TableCell>
                 <TableCell>Class</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell />
+                <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {students.data.map((s) => (
                 <TableRow key={s.id}>
                   <TableCell sx={{ fontWeight: 700 }}>
-                    <Link href={`/principal/students/${s.id}`} style={{ color: "inherit" }}>{s.name}</Link>
+                    <Link href={`/principal/students/${s.id}`} style={{ color: "inherit", textDecoration: "none" }}>{s.name}</Link>
                   </TableCell>
                   <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{s.schoolId}</TableCell>
                   <TableCell>{s.className ?? "–"}</TableCell>
@@ -47,9 +47,9 @@ export function StudentList() {
                     {s.enrollmentStatus === null && <Chip size="small" label="Not in this session" />}
                     {s.enrollmentStatus && !["ENROLLED", "WITHDRAWN"].includes(s.enrollmentStatus) && <Chip size="small" label={s.enrollmentStatus.toLowerCase()} />}
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell>
                     {s.enrollmentStatus === "ENROLLED" && s.enrollmentId && (
-                      <Button size="small" color="error" onClick={() => setTarget(s)}>Withdraw</Button>
+                      <Button size="small" variant="outlined" color="error" onClick={() => setTarget(s)}>Withdraw</Button>
                     )}
                   </TableCell>
                 </TableRow>
@@ -67,7 +67,7 @@ export function StudentList() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTarget(null)}>Cancel</Button>
+          <Button variant="outlined" onClick={() => setTarget(null)}>Cancel</Button>
           <Button color="error" variant="contained" disabled={withdraw.isPending} onClick={() => withdraw.mutate(target!.enrollmentId!, { onSuccess: () => setTarget(null) })}>
             Withdraw student
           </Button>
@@ -105,6 +105,7 @@ export function NewStudent() {
 
   function submit() {
     setError(null);
+    if (!name || !classOfferingId) return setError("Enter the student's name and choose a class.");
     const parsed = phoneNumberSchema.safeParse(phone);
     if (!parsed.success) return setError(parsed.error.issues[0].message);
     enrol.mutate(
@@ -129,7 +130,7 @@ export function NewStudent() {
             onChange={(e) => setSchoolId(e.target.value)}
             helperText="Only for students from the offline system. Leave blank to generate one."
           />
-          <Button variant="contained" onClick={submit} disabled={enrol.isPending || !name || !phone || !classOfferingId} sx={{ alignSelf: "flex-start" }}>
+          <Button variant="contained" onClick={submit} disabled={enrol.isPending} sx={{ alignSelf: "flex-start" }}>
             {enrol.isPending ? "Enrolling…" : "Enrol student"}
           </Button>
         </Stack>
@@ -200,7 +201,7 @@ export function StudentDetail({ id }: { id: string }) {
 
       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
         <ResetPasswordButton userId={s.id} name={s.name} />
-        <Button component={Link} href="/principal/students">Back to students</Button>
+        <Button component={Link} href="/principal/students" variant="outlined">Back to students</Button>
       </Stack>
     </Stack>
   );

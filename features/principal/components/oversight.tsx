@@ -5,8 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Alert, Card, CardContent, Chip, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import { apiRequest } from "@/lib/client-api";
 import type { TeacherHomeworkRow, TeacherTestRow, TeacherSyllabus } from "@/features/teacher/queries";
-import { formatDate } from "@/features/teacher/components/common";
-import { FileLinks } from "@/features/student/components/files";
+import { formatDate } from "@/lib/format";
+import { SyllabusTable } from "@/components/syllabus-table";
 
 function Loading() {
   return <Skeleton variant="rounded" height={200} />;
@@ -31,8 +31,8 @@ export function OversightHomeworkList() {
                 <TableCell>Title</TableCell>
                 <TableCell>Teacher</TableCell>
                 <TableCell>Due</TableCell>
-                <TableCell align="right">Submitted</TableCell>
-                <TableCell align="right">To remark</TableCell>
+                <TableCell>Submitted</TableCell>
+                <TableCell>To remark</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -41,13 +41,15 @@ export function OversightHomeworkList() {
                   <TableCell>{h.className}</TableCell>
                   <TableCell>{h.subject}</TableCell>
                   <TableCell>
-                    <Link href={`/principal/homework/${h.id}`} style={{ color: "inherit", fontWeight: 700 }}>{h.title}</Link>
+                    <Link href={`/principal/homework/${h.id}`} style={{ color: "inherit", fontWeight: 700, textDecoration: "none" }}>{h.title}</Link>
                   </TableCell>
                   <TableCell>{h.teacherName}</TableCell>
                   <TableCell>{formatDate(h.deadlineDate)}</TableCell>
-                  <TableCell align="right" sx={{ fontFamily: "var(--font-mono)" }}>{h.submittedCount}</TableCell>
-                  <TableCell align="right">
-                    <Chip size="small" color={h.pendingRemarkCount ? "warning" : "success"} label={h.pendingRemarkCount} />
+                  <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{h.submittedCount}/{h.expectedCount}</TableCell>
+                  <TableCell>
+                    {h.submittedCount === 0
+                      ? <Typography variant="body2" color="text.secondary">N/A</Typography>
+                      : <Chip size="small" color={h.pendingRemarkCount ? "warning" : "success"} label={h.pendingRemarkCount} />}
                   </TableCell>
                 </TableRow>
               ))}
@@ -78,8 +80,8 @@ export function OversightTestList() {
                 <TableCell>Term</TableCell>
                 <TableCell>Title</TableCell>
                 <TableCell>Teacher</TableCell>
-                <TableCell align="right">Answered</TableCell>
-                <TableCell align="right">To grade</TableCell>
+                <TableCell>Answered</TableCell>
+                <TableCell>To grade</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -89,12 +91,14 @@ export function OversightTestList() {
                   <TableCell>{t.subject}</TableCell>
                   <TableCell>{t.termLabel}</TableCell>
                   <TableCell>
-                    <Link href={`/principal/tests/${t.id}`} style={{ color: "inherit", fontWeight: 700 }}>{t.title}</Link>
+                    <Link href={`/principal/tests/${t.id}`} style={{ color: "inherit", fontWeight: 700, textDecoration: "none" }}>{t.title}</Link>
                   </TableCell>
                   <TableCell>{t.teacherName}</TableCell>
-                  <TableCell align="right" sx={{ fontFamily: "var(--font-mono)" }}>{t.answeredCount}</TableCell>
-                  <TableCell align="right">
-                    <Chip size="small" color={t.ungradedCount ? "warning" : "success"} label={t.ungradedCount} />
+                  <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{t.answeredCount}/{t.expectedCount}</TableCell>
+                  <TableCell>
+                    {t.answeredCount === 0
+                      ? <Typography variant="body2" color="text.secondary">N/A</Typography>
+                      : <Chip size="small" color={t.ungradedCount ? "warning" : "success"} label={t.ungradedCount} />}
                   </TableCell>
                 </TableRow>
               ))}
@@ -117,19 +121,8 @@ export function OversightSyllabus() {
       {syllabus.data?.map((row) => (
         <Card key={row.offeringSubjectId}>
           <CardContent>
-            <Typography variant="h3">{row.className} · {row.subject}</Typography>
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              {row.terms.map((term) => (
-                <Stack key={term.termName} spacing={0.5}>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{term.termLabel}</Typography>
-                    {!term.exists && <Chip size="small" label="Not published" />}
-                  </Stack>
-                  {term.exists && <Typography sx={{ whiteSpace: "pre-wrap" }}>{term.content}</Typography>}
-                  {term.files.length > 0 && <FileLinks files={term.files} />}
-                </Stack>
-              ))}
-            </Stack>
+            <Typography variant="h3" sx={{ mb: 2 }}>{row.className} · {row.subject}</Typography>
+            <SyllabusTable rows={row.terms.map((term) => ({ termLabel: term.termLabel, content: term.exists ? term.content : null, files: term.files }))} />
           </CardContent>
         </Card>
       ))}

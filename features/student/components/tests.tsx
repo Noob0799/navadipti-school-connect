@@ -3,11 +3,8 @@
 import Link from "next/link";
 import { Alert, Button, Card, CardContent, Chip, Skeleton, Stack, Typography } from "@mui/material";
 import { useTest, useTestList, useSubmitTest } from "../queries";
+import { formatDate } from "@/lib/format";
 import { FileLinks, FilePreview, UploadAnswer } from "./files";
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
 export function TestList() {
   const tests = useTestList();
@@ -24,7 +21,7 @@ export function TestList() {
             <Stack direction="row" spacing={2} sx={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}>
               <Stack spacing={0.5}>
                 <Typography variant="h3" sx={{ mb: 0 }}>
-                  <Link href={`/student/tests/${test.id}`} style={{ color: "inherit" }}>{test.title}</Link>
+                  <Link href={`/student/tests/${test.id}`} style={{ color: "inherit", textDecoration: "none" }}>{test.title}</Link>
                 </Typography>
                 <Typography variant="body2" color="text.secondary">{test.subject} · {test.termLabel} · out of {test.max} · due {formatDate(test.deadlineDate)}</Typography>
               </Stack>
@@ -101,7 +98,7 @@ export function TestDetail({ id }: { id: string }) {
         </Card>
       )}
 
-      <Button component={Link} href="/student/tests" sx={{ alignSelf: "flex-start" }}>Back to tests</Button>
+      <Button component={Link} href="/student/tests" variant="outlined" sx={{ alignSelf: "flex-start" }}>Back to tests</Button>
     </Stack>
   );
 }

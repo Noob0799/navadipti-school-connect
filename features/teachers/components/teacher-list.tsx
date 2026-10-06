@@ -32,7 +32,7 @@ export function TeacherList() {
               {teachers.data.map((teacher) => (
                 <TableRow key={teacher.id} hover>
                   <TableCell sx={{ fontWeight: 700 }}>
-                    <Link href={`/principal/teachers/${teacher.id}`} style={{ color: "inherit" }}>{teacher.name}</Link>
+                    <Link href={`/principal/teachers/${teacher.id}`} style={{ color: "inherit", textDecoration: "none" }}>{teacher.name}</Link>
                   </TableCell>
                   <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{teacher.phoneNumber}</TableCell>
                   <TableCell>

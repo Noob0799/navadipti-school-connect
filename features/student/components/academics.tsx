@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, Card, CardContent, Chip, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography } from "@mui/material";
+import { SyllabusTable } from "@/components/syllabus-table";
 import { useResults, useSyllabus } from "../queries";
 
 export function SyllabusView() {
@@ -15,16 +16,8 @@ export function SyllabusView() {
       {syllabus.data?.map((subject) => (
         <Card key={subject.subject}>
           <CardContent>
-            <Typography variant="h3">{subject.subject}</Typography>
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              {subject.terms.filter((t) => t.syllabus).map((term) => (
-                <Stack key={term.termName} spacing={0.5}>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>{term.termLabel}</Typography>
-                  <Typography sx={{ whiteSpace: "pre-wrap" }}>{term.syllabus?.content}</Typography>
-                </Stack>
-              ))}
-              {subject.terms.every((t) => !t.syllabus) && <Typography color="text.secondary">Not published yet.</Typography>}
-            </Stack>
+            <Typography variant="h3" sx={{ mb: 2 }}>{subject.subject}</Typography>
+            <SyllabusTable rows={subject.terms.map((term) => ({ termLabel: term.termLabel, content: term.syllabus?.content ?? null, files: term.syllabus?.files ?? [] }))} />
           </CardContent>
         </Card>
       ))}

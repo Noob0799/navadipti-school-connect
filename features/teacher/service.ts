@@ -102,6 +102,15 @@ export async function teacherAssignments(teacherId: string) {
   }));
 }
 
+async function enrolledCountsByClass(classOfferingIds: string[]) {
+  const counts = await db.enrollment.groupBy({
+    by: ["classOfferingId"],
+    where: { classOfferingId: { in: [...new Set(classOfferingIds)] }, status: "ENROLLED" },
+    _count: { _all: true },
+  });
+  return new Map(counts.map((row) => [row.classOfferingId, row._count._all]));
+}
+
 export async function listTeacherHomework(teacherId: string | null) {
   const rows = await db.homework.findMany({
     where: teacherId ? HOMEWORK_OWNED(teacherId) : ACTIVE_ONLY,
@@ -112,6 +121,7 @@ export async function listTeacherHomework(teacherId: string | null) {
       deadlineDate: true,
       offeringSubject: {
         select: {
+          classOfferingId: true,
           subject: { select: { name: true } },
           classOffering: { select: { schoolClass: { select: { name: true } } } },
           teacherAssignment: { select: { teacher: { select: { name: true } } } },
@@ -120,6 +130,7 @@ export async function listTeacherHomework(teacherId: string | null) {
       submissions: { select: { teacherRemark: true } },
     },
   });
+  const expectedByClass = await enrolledCountsByClass(rows.map((row) => row.offeringSubject.classOfferingId));
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -127,6 +138,7 @@ export async function listTeacherHomework(teacherId: string | null) {
     deadlineDate: row.deadlineDate,
     subject: row.offeringSubject.subject.name,
     className: row.offeringSubject.classOffering.schoolClass.name,
+    expectedCount: expectedByClass.get(row.offeringSubject.classOfferingId) ?? 0,
     submittedCount: row.submissions.length,
     pendingRemarkCount: row.submissions.filter((s) => s.teacherRemark === null).length,
   }));
@@ -249,6 +261,7 @@ export async function listTeacherTests(teacherId: string | null) {
       term: { select: { name: true } },
       offeringSubject: {
         select: {
+          classOfferingId: true,
           subject: { select: { name: true } },
           classOffering: { select: { schoolClass: { select: { name: true } } } },
           teacherAssignment: { select: { teacher: { select: { name: true } } } },
@@ -257,6 +270,7 @@ export async function listTeacherTests(teacherId: string | null) {
       submissions: { select: { marksObtained: true } },
     },
   });
+  const expectedByClass = await enrolledCountsByClass(rows.map((row) => row.offeringSubject.classOfferingId));
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
@@ -267,6 +281,7 @@ export async function listTeacherTests(teacherId: string | null) {
     max: TERM_SCALE[row.term.name].max,
     subject: row.offeringSubject.subject.name,
     className: row.offeringSubject.classOffering.schoolClass.name,
+    expectedCount: expectedByClass.get(row.offeringSubject.classOfferingId) ?? 0,
     answeredCount: row.submissions.length,
     ungradedCount: row.submissions.filter((s) => s.marksObtained === null).length,
   }));
@@ -458,9 +473,20 @@ export async function teacherOwnsOwner(teacherId: string, ownerType: AttachmentO
   return false;
 }
 
+export async function syllabusToPublish(teacherId: string) {
+  const rows = await listTeacherSyllabus(teacherId);
+  return rows.map((row) => ({
+    offeringSubjectId: row.offeringSubjectId,
+    className: row.className,
+    subject: row.subject,
+    pending: row.terms.filter((term) => !term.exists).length,
+  }));
+}
+
 export async function listTeacherPending(teacherId: string) {
-  const [homework, tests] = await Promise.all([listTeacherHomework(teacherId), listTeacherTests(teacherId)]);
+  const [homework, tests, syllabus] = await Promise.all([listTeacherHomework(teacherId), listTeacherTests(teacherId), syllabusToPublish(teacherId)]);
   return {
+    syllabus,
     homework: homework.filter((h) => h.pendingRemarkCount > 0).map((h) => ({
       id: h.id,
       title: h.title,
