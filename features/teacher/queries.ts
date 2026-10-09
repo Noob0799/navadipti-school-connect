@@ -42,7 +42,6 @@ export type TeacherHomework = {
 
 export type TeacherTestRow = {
   id: string;
-  title: string;
   teacherName: string;
   deadlineDate: string;
   termName: string;
@@ -57,7 +56,6 @@ export type TeacherTestRow = {
 
 export type TeacherTest = {
   id: string;
-  title: string;
   deadlineDate: string;
   termName: string;
   termLabel: string;
@@ -95,7 +93,7 @@ export function useTeacherPending() {
     queryFn: () =>
       apiRequest<{
         homework: { id: string; title: string; subject: string; className: string; pending: number }[];
-        tests: { id: string; title: string; subject: string; className: string; termLabel: string; pending: number }[];
+        tests: { id: string; subject: string; className: string; termLabel: string; pending: number }[];
         syllabus: { offeringSubjectId: string; className: string; subject: string; pending: number }[];
       }>("/api/dashboard/teacher/pending"),
   });
@@ -151,8 +149,17 @@ export function useTeacherTest(id: string) {
 export function useSaveTest() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ offeringSubjectId, termName, title, deadlineDate }: { offeringSubjectId: string; termName: string; title: string; deadlineDate: string }) =>
-      apiRequest<{ id: string }>(`/api/offering-subjects/${offeringSubjectId}/tests/${termName}`, { method: "PUT", body: JSON.stringify({ title, deadlineDate }) }),
+    mutationFn: ({ offeringSubjectId, termName, deadlineDate }: { offeringSubjectId: string; termName: string; deadlineDate: string }) =>
+      apiRequest<{ id: string }>(`/api/offering-subjects/${offeringSubjectId}/tests/${termName}`, { method: "PUT", body: JSON.stringify({ deadlineDate }) }),
+    onSuccess: () => invalidateTeacher(queryClient),
+  });
+}
+
+export function useUpdateTest(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { deadlineDate?: string }) =>
+      apiRequest(`/api/tests/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: () => invalidateTeacher(queryClient),
   });
 }
@@ -182,7 +189,7 @@ export function useSaveSyllabus() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ offeringSubjectId, termName, content }: { offeringSubjectId: string; termName: string; content: string }) =>
-      apiRequest(`/api/offering-subjects/${offeringSubjectId}/syllabus/${termName}`, { method: "PUT", body: JSON.stringify({ content }) }),
+      apiRequest<{ id: string }>(`/api/offering-subjects/${offeringSubjectId}/syllabus/${termName}`, { method: "PUT", body: JSON.stringify({ content }) }),
     onSuccess: () => invalidateTeacher(queryClient),
   });
 }

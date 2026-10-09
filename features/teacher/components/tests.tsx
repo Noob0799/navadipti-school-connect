@@ -6,9 +6,9 @@ import { Alert, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogCo
 import type { FileRef } from "@/features/student/queries";
 import { FileLinks, FilePreview } from "@/features/student/components/files";
 import { TERM_NAMES, TERM_SCALE } from "@/lib/academic";
-import { useAssignments, useGradeSubmission, useReleaseGrades, useSaveTest, useTeacherTest, useTeacherTestList } from "../queries";
+import { useAssignments, useGradeSubmission, useReleaseGrades, useSaveTest, useTeacherTest, useTeacherTestList, useUpdateTest } from "../queries";
 import { formatDate } from "@/lib/format";
-import { EditableFiles, TeacherUpload } from "./common";
+import { FileStagingGrid, useFileStaging } from "./common";
 
 export function TeacherTestList() {
   const list = useTeacherTestList();
@@ -24,24 +24,44 @@ export function TeacherTestList() {
       {list.isPending && <Skeleton variant="rounded" height={160} />}
       {list.isError && <Alert severity="error">{list.error.message}</Alert>}
       {list.data?.length === 0 && <Alert severity="info">No tests yet. Set one up for a class and term.</Alert>}
-      {list.data?.map((t) => (
-        <Card key={t.id}>
-          <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Stack>
-              <Typography variant="h3" sx={{ mb: 0 }}>
-                <Link href={`/teacher/tests/${t.id}`} style={{ color: "inherit", textDecoration: "none" }}>{t.title}</Link>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">{t.className} · {t.subject} · {t.termLabel} · out of {t.max}</Typography>
-            </Stack>
-            <Stack direction="row" spacing={1}>
-              <Chip size="small" label={`${t.answeredCount}/${t.expectedCount} answered`} />
-              {t.answeredCount === 0
-                ? <Chip size="small" label="N/A to grade" />
-                : <Chip size="small" color={t.ungradedCount ? "warning" : "success"} label={t.ungradedCount ? `${t.ungradedCount} to grade` : "All graded"} />}
-            </Stack>
-          </CardContent>
-        </Card>
-      ))}
+      {list.data && list.data.length > 0 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small" sx={{ "& th": { whiteSpace: "nowrap" } }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Class</TableCell>
+                <TableCell>Subject</TableCell>
+                <TableCell>Term</TableCell>
+                <TableCell>Out of</TableCell>
+                <TableCell>Answered</TableCell>
+                <TableCell>To grade</TableCell>
+                <TableCell>Action</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {list.data.map((t) => (
+                <TableRow key={t.id} hover>
+                  <TableCell sx={{ fontWeight: 700 }}>{t.className}</TableCell>
+                  <TableCell>{t.subject}</TableCell>
+                  <TableCell>{t.termLabel}</TableCell>
+                  <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{t.max}</TableCell>
+                  <TableCell>
+                    <Chip size="small" label={`${t.answeredCount}/${t.expectedCount}`} />
+                  </TableCell>
+                  <TableCell>
+                    {t.answeredCount === 0
+                      ? <Chip size="small" label="N/A" />
+                      : <Chip size="small" color={t.ungradedCount ? "warning" : "success"} label={t.ungradedCount ? `${t.ungradedCount}` : "All graded"} />}
+                  </TableCell>
+                  <TableCell>
+                    <Button component={Link} href={`/teacher/tests/${t.id}`} size="small" variant="outlined">Open</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
       <NewTestDialog open={open} onClose={() => setOpen(false)} />
     </Stack>
   );
@@ -50,17 +70,26 @@ export function TeacherTestList() {
 function NewTestDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const assignments = useAssignments();
   const save = useSaveTest();
+  const staging = useFileStaging([], "TEST");
   const [offeringSubjectId, setOfferingSubjectId] = useState("");
   const [termName, setTermName] = useState("CT1");
-  const [title, setTitle] = useState("");
   const [deadlineDate, setDeadlineDate] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function submit() {
     setError(null);
-    if (!offeringSubjectId || !title || !deadlineDate) return setError("Choose a class, add a title and set a deadline.");
-    save.mutate({ offeringSubjectId, termName, title, deadlineDate }, {
-      onSuccess: () => { setTitle(""); setDeadlineDate(""); onClose(); },
+    if (!offeringSubjectId || !deadlineDate) return setError("Choose a class and set a deadline.");
+    if (staging.pendingFiles.length === 0) return setError("Attach the question paper.");
+    save.mutate({ offeringSubjectId, termName, deadlineDate }, {
+      onSuccess: async (result) => {
+        try {
+          await staging.commit(result.id);
+          setDeadlineDate("");
+          onClose();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Test was saved, but some attachments failed to upload.");
+        }
+      },
       onError: (e) => setError(e.message),
     });
   }
@@ -77,14 +106,17 @@ function NewTestDialog({ open, onClose }: { open: boolean; onClose: () => void }
           <TextField select label="Term" value={termName} onChange={(e) => setTermName(e.target.value)}>
             {TERM_NAMES.map((name) => <MenuItem key={name} value={name}>{TERM_SCALE[name].label} (out of {TERM_SCALE[name].max})</MenuItem>)}
           </TextField>
-          <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
           <TextField label="Deadline" type="date" slotProps={{ inputLabel: { shrink: true } }} value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
+          <Stack spacing={1}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>Question paper</Typography>
+            <FileStagingGrid staging={staging} label="Attach question paper" />
+          </Stack>
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button variant="outlined" onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={save.isPending}>
-          {save.isPending ? "Saving…" : "Save and notify class"}
+        <Button variant="contained" onClick={submit} disabled={save.isPending || staging.busy}>
+          {save.isPending || staging.busy ? "Saving…" : "Save and notify class"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -94,31 +126,73 @@ function NewTestDialog({ open, onClose }: { open: boolean; onClose: () => void }
 export function TeacherTestDetail({ id, readOnly = false, backHref = "/teacher/tests" }: { id: string; readOnly?: boolean; backHref?: string }) {
   const test = useTeacherTest(id);
   const release = useReleaseGrades();
+  const update = useUpdateTest(id);
+  const staging = useFileStaging(test.data?.paper ?? [], "TEST");
   const [grading, setGrading] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (test.isPending) return <Skeleton variant="rounded" height={320} />;
   if (test.isError) return <Alert severity="error">{test.error.message}</Alert>;
   const item = test.data;
-  const active = item.students.find((s) => s.submissionId === grading) ?? null;
+  const active = grading ? item.students.find((s) => s.submissionId === grading) ?? null : null;
   const ungraded = item.students.filter((s) => s.answered && s.marks === null).length;
+  const readyToRelease = item.students.length > 0 && item.students.every((s) => s.answered && s.marks !== null);
+
+  function cancelEdit() {
+    staging.discard();
+    setSaveError(null);
+    setEditing(false);
+  }
+
+  async function saveQuestionPaper() {
+    setSaveError(null);
+    if (staging.visibleFiles.length + staging.pendingFiles.length === 0) return setSaveError("Attach the question paper.");
+    update.mutate({}, {
+      onSuccess: async () => {
+        try {
+          await staging.commit(item.id);
+          setEditing(false);
+        } catch (e) {
+          setSaveError(e instanceof Error ? e.message : "Saved, but some attachment changes failed.");
+        }
+      },
+      onError: (e) => setSaveError(e.message),
+    });
+  }
 
   return (
     <Stack spacing={3}>
       <Stack spacing={0.5}>
-        <Typography variant="h1" sx={{ fontSize: 30 }}>{item.title}</Typography>
-        <Typography color="text.secondary">{item.className} · {item.subject} · {item.termLabel} · out of {item.max} · pass {item.pass} · deadline {formatDate(item.deadlineDate)}</Typography>
+        <Typography variant="h1" sx={{ fontSize: 30 }}>{item.subject} · {item.termLabel}</Typography>
+        <Typography color="text.secondary">{item.className} · out of {item.max} · pass {item.pass} · deadline {formatDate(item.deadlineDate)}</Typography>
       </Stack>
 
       <Card>
         <CardContent>
-          <Typography variant="h3">Question paper</Typography>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+            <Typography variant="h3">Question paper</Typography>
+            {!readOnly && !editing && <Button size="small" onClick={() => setEditing(true)}>Edit</Button>}
+          </Stack>
           <Stack spacing={1.5} sx={{ mt: 1 }}>
-            {readOnly ? <FileLinks files={item.paper} /> : (
+            {saveError && <Alert severity="error">{saveError}</Alert>}
+            {editing ? (
               <>
-                <EditableFiles files={item.paper} />
-                <TeacherUpload ownerType="TEST" ownerId={item.id} label="Attach question paper" />
+                <FileStagingGrid staging={staging} label="Attach question paper" />
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="contained"
+                    disabled={update.isPending || staging.busy}
+                    onClick={saveQuestionPaper}
+                  >
+                    {update.isPending || staging.busy ? "Saving…" : "Save and notify class"}
+                  </Button>
+                  <Button variant="outlined" disabled={update.isPending || staging.busy} onClick={cancelEdit}>Cancel</Button>
+                </Stack>
               </>
+            ) : (
+              <FileLinks files={item.paper} />
             )}
           </Stack>
         </CardContent>
@@ -134,15 +208,21 @@ export function TeacherTestDetail({ id, readOnly = false, backHref = "/teacher/t
                 : <Chip size="small" color={ungraded ? "warning" : "success"} label={`${ungraded} to grade`} />}
               {!readOnly && <Button
                 variant="outlined"
-                disabled={release.isPending}
+                disabled={release.isPending || !readyToRelease}
                 onClick={() => release.mutate(item.id, {
-                  onSuccess: (r) => setMessage(r.ungraded ? `Class notified. ${r.ungraded} answer(s) are still ungraded.` : "Class notified that grades are out."),
+                  onSuccess: () => setMessage("Class notified that grades are out."),
                 })}
               >
                 Release grades to class
               </Button>}
             </Stack>
           </Stack>
+          {!readOnly && !readyToRelease && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Release unlocks once every student has submitted and every answer is graded.
+            </Typography>
+          )}
+          {release.isError && <Alert severity="error" sx={{ mt: 2 }}>{release.error.message}</Alert>}
           {message && <Alert severity="success" sx={{ mt: 2 }} onClose={() => setMessage(null)}>{message}</Alert>}
           <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
             <Table size="small">

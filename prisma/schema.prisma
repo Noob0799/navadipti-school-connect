@@ -264,7 +264,6 @@ model Test {
   offeringSubject   OfferingSubject @relation(fields: [offeringSubjectId], references: [id])
   termId            String
   term              Term     @relation(fields: [termId], references: [id])
-  title             String
   deadlineDate      DateTime
   createdById       String
   createdBy         User     @relation("TestCreatedBy", fields: [createdById], references: [id])

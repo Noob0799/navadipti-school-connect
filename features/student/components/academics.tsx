@@ -1,7 +1,7 @@
 "use client";
 
-import { Alert, Card, CardContent, Chip, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography } from "@mui/material";
-import { SyllabusTable } from "@/components/syllabus-table";
+import { Alert, Card, CardContent, Chip, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Tooltip, Typography } from "@mui/material";
+import { SyllabusTerms } from "@/components/syllabus-terms";
 import { useResults, useSyllabus } from "../queries";
 
 export function SyllabusView() {
@@ -17,7 +17,7 @@ export function SyllabusView() {
         <Card key={subject.subject}>
           <CardContent>
             <Typography variant="h3" sx={{ mb: 2 }}>{subject.subject}</Typography>
-            <SyllabusTable rows={subject.terms.map((term) => ({ termLabel: term.termLabel, content: term.syllabus?.content ?? null, files: term.syllabus?.files ?? [] }))} />
+            <SyllabusTerms rows={subject.terms.map((term) => ({ termLabel: term.termLabel, content: term.syllabus?.content ?? null, files: term.syllabus?.files ?? [] }))} />
           </CardContent>
         </Card>
       ))}
@@ -47,7 +47,13 @@ export function ResultsView() {
               </Stack>
             </Stack>
             <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
-              <Table size="small">
+              <Table size="small" sx={{ tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: "20%" }} />
+                  <col style={{ width: "18%" }} />
+                  <col style={{ width: "20%" }} />
+                  <col style={{ width: "42%" }} />
+                </colgroup>
                 <TableHead>
                   <TableRow>
                     <TableCell>Test</TableCell>
@@ -66,7 +72,26 @@ export function ResultsView() {
                           ? <Chip size="small" color="warning" label="Not graded" />
                           : <Chip size="small" color={test.marks >= test.pass ? "success" : "error"} label={test.marks >= test.pass ? "Pass" : "Fail"} />}
                       </TableCell>
-                      <TableCell>{test.remark ?? "–"}</TableCell>
+                      <TableCell>
+                        {test.remark ? (
+                          <Tooltip title={test.remark}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                overflowWrap: "anywhere",
+                              }}
+                            >
+                              {test.remark}
+                            </Typography>
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">–</Typography>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

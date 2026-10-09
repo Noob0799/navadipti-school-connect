@@ -11,6 +11,6 @@ export const PUT = withRole<Context>(["TEACHER"], async (request, { params }, se
   const term = termNameSchema.safeParse(termName);
   if (!term.success) throw new HttpError(400, "Unknown term.");
   const input = await parseBody(request, syllabusSchema);
-  await upsertSyllabus(session.userId, id, term.data, input.content);
-  return Response.json({ ok: true });
+  const result = await upsertSyllabus(session.userId, id, term.data, input.content);
+  return Response.json(result);
 });

@@ -158,7 +158,6 @@ async function seedDemoClassroom() {
     create: {
       offeringSubjectId: maths.id,
       termId: ct1.id,
-      title: "Maths Class Test 1",
       deadlineDate: new Date("2026-10-02"),
       createdById: teacher.id,
     },
@@ -183,7 +182,6 @@ async function seedDemoClassroom() {
     create: {
       offeringSubjectId: english.id,
       termId: halfYearly.id,
-      title: "English Half Yearly",
       deadlineDate: new Date("2026-11-20"),
       createdById: teacher.id,
     },

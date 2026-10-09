@@ -7,7 +7,7 @@ import type { FileRef } from "@/features/student/queries";
 import { FileLinks, FilePreview } from "@/features/student/components/files";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useAssignments, useCreateHomework, useSaveRemark, useTeacherHomework, useTeacherHomeworkList, useUpdateHomework } from "../queries";
-import { EditableFiles, TeacherUpload } from "./common";
+import { FileStagingGrid, useFileStaging } from "./common";
 
 export function TeacherHomeworkList() {
   const list = useTeacherHomeworkList();
@@ -23,21 +23,44 @@ export function TeacherHomeworkList() {
       {list.isPending && <Skeleton variant="rounded" height={160} />}
       {list.isError && <Alert severity="error">{list.error.message}</Alert>}
       {list.data?.length === 0 && <Alert severity="info">No homework yet. Create one for a class you teach.</Alert>}
-      {list.data?.map((h) => (
-        <Card key={h.id}>
-          <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-            <Stack>
-              <Typography variant="h3" sx={{ mb: 0 }}>
-                <Link href={`/teacher/homework/${h.id}`} style={{ color: "inherit", textDecoration: "none" }}>{h.title}</Link>
-              </Typography>
-              <Typography variant="body2" color="text.secondary">{h.className} · {h.subject} · due {formatDate(h.deadlineDate)}</Typography>
-            </Stack>
-            <Typography variant="body2">
-              {h.submittedCount}/{h.expectedCount} submitted · {h.submittedCount === 0 ? "N/A" : h.pendingRemarkCount} to remark
-            </Typography>
-          </CardContent>
-        </Card>
-      ))}
+      {list.data && list.data.length > 0 && (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small" sx={{ "& th": { whiteSpace: "nowrap" } }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Title</TableCell>
+                <TableCell>Class</TableCell>
+                <TableCell>Subject</TableCell>
+                <TableCell>Due</TableCell>
+                <TableCell>Submitted</TableCell>
+                <TableCell>To remark</TableCell>
+                <TableCell>Action</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {list.data.map((h) => (
+                <TableRow key={h.id} hover>
+                  <TableCell sx={{ fontWeight: 700 }}>{h.title}</TableCell>
+                  <TableCell>{h.className}</TableCell>
+                  <TableCell>{h.subject}</TableCell>
+                  <TableCell>{formatDate(h.deadlineDate)}</TableCell>
+                  <TableCell>
+                    <Chip size="small" label={`${h.submittedCount}/${h.expectedCount}`} />
+                  </TableCell>
+                  <TableCell>
+                    {h.submittedCount === 0
+                      ? <Chip size="small" label="N/A" />
+                      : <Chip size="small" color={h.pendingRemarkCount ? "warning" : "success"} label={h.pendingRemarkCount || "All remarked"} />}
+                  </TableCell>
+                  <TableCell>
+                    <Button component={Link} href={`/teacher/homework/${h.id}`} size="small" variant="outlined">Open</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
       <NewHomeworkDialog open={open} onClose={() => setOpen(false)} />
     </Stack>
   );
@@ -46,6 +69,7 @@ export function TeacherHomeworkList() {
 function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const assignments = useAssignments();
   const create = useCreateHomework();
+  const staging = useFileStaging([], "HOMEWORK");
   const [offeringSubjectId, setOfferingSubjectId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -55,12 +79,18 @@ function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => vo
   function save() {
     setError(null);
     if (!offeringSubjectId || !title || !deadlineDate) return setError("Choose a class, add a title and set a due date.");
+    if (!description.trim() && staging.pendingFiles.length === 0) return setError("Add instructions or attach a file.");
     create.mutate(
       { offeringSubjectId, title, description, deadlineDate },
       {
-        onSuccess: () => {
-          setTitle(""); setDescription(""); setDeadlineDate("");
-          onClose();
+        onSuccess: async (result) => {
+          try {
+            await staging.commit(result.id);
+            setTitle(""); setDescription(""); setDeadlineDate("");
+            onClose();
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Homework was posted, but some attachments failed to upload.");
+          }
         },
         onError: (e) => setError(e.message),
       },
@@ -81,12 +111,16 @@ function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => vo
           <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
           <TextField label="Instructions" multiline minRows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
           <TextField label="Due date" type="date" slotProps={{ inputLabel: { shrink: true } }} value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
+          <Stack spacing={1}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>Attachments</Typography>
+            <FileStagingGrid staging={staging} label="Attach file" />
+          </Stack>
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button variant="outlined" onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={save} disabled={create.isPending}>
-          {create.isPending ? "Posting…" : "Post to class"}
+        <Button variant="contained" onClick={save} disabled={create.isPending || staging.busy}>
+          {create.isPending || staging.busy ? "Posting…" : "Post to class"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -96,14 +130,37 @@ function NewHomeworkDialog({ open, onClose }: { open: boolean; onClose: () => vo
 export function TeacherHomeworkDetail({ id, readOnly = false, backHref = "/teacher/homework" }: { id: string; readOnly?: boolean; backHref?: string }) {
   const homework = useTeacherHomework(id);
   const update = useUpdateHomework(id);
+  const staging = useFileStaging(homework.data?.materials ?? [], "HOMEWORK");
   const [review, setReview] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (homework.isPending) return <Skeleton variant="rounded" height={320} />;
   if (homework.isError) return <Alert severity="error">{homework.error.message}</Alert>;
   const item = homework.data;
-  const reviewing = item.submissions.find((s) => s.submissionId === review) ?? null;
+  const reviewing = review ? item.submissions.find((s) => s.submissionId === review) ?? null : null;
   const pendingRemark = item.submissions.filter((s) => s.submitted && !s.remark).length;
+
+  function cancelEdit() {
+    staging.discard();
+    setSaveError(null);
+    setEditing(false);
+  }
+
+  async function save(values: { title: string; description: string; deadlineDate: string }) {
+    setSaveError(null);
+    update.mutate(values, {
+      onSuccess: async () => {
+        try {
+          await staging.commit(item.id);
+          setEditing(false);
+        } catch (e) {
+          setSaveError(e instanceof Error ? e.message : "Saved, but some attachment changes failed.");
+        }
+      },
+      onError: (e) => setSaveError(e.message),
+    });
+  }
 
   return (
     <Stack spacing={3}>
@@ -116,25 +173,22 @@ export function TeacherHomeworkDetail({ id, readOnly = false, backHref = "/teach
         <CardContent>
           <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
             <Typography variant="h3">Instructions and material</Typography>
-            {!readOnly && <Button size="small" onClick={() => setEditing((v) => !v)}>{editing ? "Close" : "Edit"}</Button>}
+            {!readOnly && !editing && <Button size="small" onClick={() => setEditing(true)}>Edit</Button>}
           </Stack>
           {editing ? (
             <EditForm
               initial={{ title: item.title, description: item.description, deadlineDate: item.deadlineDate.slice(0, 10) }}
-              pending={update.isPending}
-              error={update.error?.message ?? null}
-              onSave={(values) => update.mutate(values, { onSuccess: () => setEditing(false) })}
+              pending={update.isPending || staging.busy}
+              error={saveError}
+              staging={staging}
+              onSave={save}
+              onCancel={cancelEdit}
             />
           ) : (
-            <Typography sx={{ whiteSpace: "pre-wrap", mb: 2 }}>{item.description || "No instructions."}</Typography>
-          )}
-          <Typography variant="body2" sx={{ fontWeight: 700, mt: 2, mb: 1 }}>Question paper and material</Typography>
-          {readOnly ? <FileLinks files={item.materials} /> : (
             <>
-              <EditableFiles files={item.materials} />
-              <Stack sx={{ mt: 1 }}>
-                <TeacherUpload ownerType="HOMEWORK" ownerId={item.id} label="Attach file" />
-              </Stack>
+              <Typography sx={{ whiteSpace: "pre-wrap", mb: 2 }}>{item.description || "No instructions."}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700, mt: 2, mb: 1 }}>Question paper and material</Typography>
+              <FileLinks files={item.materials} />
             </>
           )}
         </CardContent>
@@ -201,17 +255,33 @@ export function TeacherHomeworkDetail({ id, readOnly = false, backHref = "/teach
   );
 }
 
-function EditForm({ initial, pending, error, onSave }: { initial: { title: string; description: string; deadlineDate: string }; pending: boolean; error: string | null; onSave: (values: { title: string; description: string; deadlineDate: string }) => void }) {
+function EditForm({ initial, pending, error, staging, onSave, onCancel }: { initial: { title: string; description: string; deadlineDate: string }; pending: boolean; error: string | null; staging: ReturnType<typeof useFileStaging>; onSave: (values: { title: string; description: string; deadlineDate: string }) => void; onCancel: () => void }) {
   const [values, setValues] = useState(initial);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const attachmentCount = staging.visibleFiles.length + staging.pendingFiles.length;
+
+  function submit() {
+    if (!values.description.trim() && attachmentCount === 0) return setLocalError("Add instructions or attach a file.");
+    setLocalError(null);
+    onSave(values);
+  }
+
   return (
     <Stack spacing={2} sx={{ mt: 1, mb: 2 }}>
-      {error && <Alert severity="error">{error}</Alert>}
+      {(localError || error) && <Alert severity="error">{localError || error}</Alert>}
       <TextField label="Title" value={values.title} onChange={(e) => setValues({ ...values, title: e.target.value })} />
       <TextField label="Instructions" multiline minRows={3} value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} />
       <TextField label="Due date" type="date" slotProps={{ inputLabel: { shrink: true } }} value={values.deadlineDate} onChange={(e) => setValues({ ...values, deadlineDate: e.target.value })} />
-      <Button variant="contained" disabled={pending} onClick={() => onSave(values)} sx={{ alignSelf: "flex-start" }}>
-        {pending ? "Saving…" : "Save and notify class"}
-      </Button>
+      <Stack spacing={1}>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>Question paper and material</Typography>
+        <FileStagingGrid staging={staging} label="Attach file" />
+      </Stack>
+      <Stack direction="row" spacing={1}>
+        <Button variant="contained" disabled={pending} onClick={submit}>
+          {pending ? "Saving…" : "Save and notify class"}
+        </Button>
+        <Button variant="outlined" disabled={pending} onClick={onCancel}>Cancel</Button>
+      </Stack>
     </Stack>
   );
 }

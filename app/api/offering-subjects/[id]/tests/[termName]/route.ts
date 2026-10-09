@@ -1,4 +1,4 @@
-import { createOrUpdateTest } from "@/features/teacher/service";
+import { createTest } from "@/features/teacher/service";
 import { termNameSchema, testInputSchema } from "@/features/teacher/schemas";
 import { HttpError } from "@/lib/errors";
 import { parseBody } from "@/lib/http";
@@ -11,6 +11,6 @@ export const PUT = withRole<Context>(["TEACHER"], async (request, { params }, se
   const term = termNameSchema.safeParse(termName);
   if (!term.success) throw new HttpError(400, "Unknown term.");
   const input = await parseBody(request, testInputSchema);
-  const testId = await createOrUpdateTest(session.userId, id, term.data, input);
+  const testId = await createTest(session.userId, id, term.data, input);
   return Response.json({ id: testId });
 });

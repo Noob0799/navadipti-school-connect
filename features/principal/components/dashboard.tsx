@@ -103,7 +103,14 @@ export function PrincipalDashboard() {
               {teacher.rows.length === 0 ? (
                 <Typography color="text.secondary" sx={{ mt: 1 }}>No classes assigned this session.</Typography>
               ) : (
-                <Table size="small" sx={{ mt: 1.5 }}>
+                <Table size="small" sx={{ mt: 1.5, tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: "22%" }} />
+                    <col style={{ width: "20%" }} />
+                    <col style={{ width: "20%" }} />
+                    <col style={{ width: "20%" }} />
+                  </colgroup>
                   <TableHead>
                     <TableRow>
                       <TableCell>Class</TableCell>

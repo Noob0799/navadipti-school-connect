@@ -17,7 +17,6 @@ export type HomeworkItem = {
 
 export type TestItem = {
   id: string;
-  title: string;
   subject: string;
   termName: string;
   termLabel: string;
@@ -51,7 +50,7 @@ export function usePending() {
     queryFn: () =>
       apiRequest<{
         homework: { id: string; title: string; subject: string; deadlineDate: string }[];
-        tests: { id: string; title: string; subject: string; termLabel: string; deadlineDate: string; max: number }[];
+        tests: { id: string; subject: string; termLabel: string; deadlineDate: string; max: number }[];
       }>("/api/dashboard/student/pending"),
   });
 }

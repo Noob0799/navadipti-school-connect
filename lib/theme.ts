@@ -41,6 +41,11 @@ export const theme = createTheme({
         paper: { borderRadius: 14 },
       },
     },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: { padding: "8px 24px 20px" },
+      },
+    },
     MuiTableContainer: {
       styleOverrides: {
         root: { border: `1px solid ${LINE}`, borderRadius: 14 },

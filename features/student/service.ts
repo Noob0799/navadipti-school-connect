@@ -73,7 +73,6 @@ export async function listTests(studentId: string) {
     orderBy: { deadlineDate: "asc" },
     select: {
       id: true,
-      title: true,
       deadlineDate: true,
       term: { select: { name: true } },
       offeringSubject: { select: { subject: { select: { name: true } } } },
@@ -92,7 +91,6 @@ export async function listTests(studentId: string) {
     const submission = row.submissions[0] ?? null;
     return {
       id: row.id,
-      title: row.title,
       subject: row.offeringSubject.subject.name,
       termName: row.term.name,
       termLabel: scale.label,
@@ -122,7 +120,10 @@ export async function getTest(testId: string, studentId: string) {
 }
 
 export async function submitTest(testId: string, studentId: string) {
-  await getTest(testId, studentId);
+  const test = await getTest(testId, studentId);
+  if (new Date() > test.deadlineDate) {
+    throw new HttpError(409, "The deadline for this test has passed. You can no longer submit an answer.");
+  }
   const submission = await db.testSubmission.upsert({
     where: { testId_studentId: { testId, studentId } },
     update: { submittedAt: new Date() },
@@ -261,7 +262,7 @@ export async function pendingForStudent(studentId: string) {
   const [homework, tests] = await Promise.all([listHomework(studentId), listTests(studentId)]);
   return {
     homework: homework.filter((h) => h.submission === null).map((h) => ({ id: h.id, title: h.title, subject: h.subject, deadlineDate: h.deadlineDate })),
-    tests: tests.filter((t) => t.submission === null).map((t) => ({ id: t.id, title: t.title, subject: t.subject, termLabel: t.termLabel, deadlineDate: t.deadlineDate, max: t.max })),
+    tests: tests.filter((t) => t.submission === null).map((t) => ({ id: t.id, subject: t.subject, termLabel: t.termLabel, deadlineDate: t.deadlineDate, max: t.max })),
   };
 }
 

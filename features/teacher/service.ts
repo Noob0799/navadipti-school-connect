@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { HttpError } from "@/lib/errors";
 import { TERM_NAMES, TERM_SCALE } from "@/lib/academic";
 import { filesByOwner } from "@/features/attachments/lookup";
-import type { GradeInput, HomeworkInput, HomeworkUpdate, TestInput } from "./schemas";
+import type { GradeInput, HomeworkInput, HomeworkUpdate, TestInput, TestUpdate } from "./schemas";
 
 const ACTIVE_SESSION = { classOffering: { academicSession: { status: "ACTIVE" as const } } };
 
@@ -64,7 +64,6 @@ async function ownedTest(teacherId: string | null, id: string) {
     where: { id, ...(teacherId ? TEST_OWNED(teacherId) : ACTIVE_ONLY) },
     select: {
       id: true,
-      title: true,
       deadlineDate: true,
       term: { select: { name: true } },
       offeringSubject: {
@@ -256,7 +255,6 @@ export async function listTeacherTests(teacherId: string | null) {
     orderBy: { deadlineDate: "asc" },
     select: {
       id: true,
-      title: true,
       deadlineDate: true,
       term: { select: { name: true } },
       offeringSubject: {
@@ -273,7 +271,6 @@ export async function listTeacherTests(teacherId: string | null) {
   const expectedByClass = await enrolledCountsByClass(rows.map((row) => row.offeringSubject.classOfferingId));
   return rows.map((row) => ({
     id: row.id,
-    title: row.title,
     teacherName: row.offeringSubject.teacherAssignment?.teacher.name ?? "",
     deadlineDate: row.deadlineDate,
     termName: row.term.name,
@@ -311,7 +308,6 @@ async function testDetail(row: NonNullable<Awaited<ReturnType<typeof ownedTest>>
 
   return {
     id: row.id,
-    title: row.title,
     deadlineDate: row.deadlineDate,
     termName,
     termLabel: scale.label,
@@ -337,7 +333,7 @@ async function testDetail(row: NonNullable<Awaited<ReturnType<typeof ownedTest>>
   };
 }
 
-export async function createOrUpdateTest(teacherId: string, offeringSubjectId: string, termName: TermName, input: TestInput) {
+export async function createTest(teacherId: string, offeringSubjectId: string, termName: TermName, input: TestInput) {
   const offering = await ownedOfferingSubject(teacherId, offeringSubjectId);
   const term = await db.term.findFirst({
     where: { name: termName, academicSession: { status: "ACTIVE" } },
@@ -349,20 +345,37 @@ export async function createOrUpdateTest(teacherId: string, offeringSubjectId: s
     where: { offeringSubjectId_termId: { offeringSubjectId: offering.id, termId: term.id } },
     select: { id: true },
   });
-  const test = await db.test.upsert({
-    where: { offeringSubjectId_termId: { offeringSubjectId: offering.id, termId: term.id } },
-    update: { title: input.title, deadlineDate: input.deadlineDate },
-    create: { offeringSubjectId: offering.id, termId: term.id, title: input.title, deadlineDate: input.deadlineDate, createdById: teacherId },
+  if (existing) {
+    throw new HttpError(409, `A test for ${offering.className} ${offering.subjectName}, ${TERM_SCALE[termName].label} already exists.`);
+  }
+  const test = await db.test.create({
+    data: { offeringSubjectId: offering.id, termId: term.id, deadlineDate: input.deadlineDate, createdById: teacherId },
     select: { id: true },
   });
 
   await notify({
     type: "TEST_CHANGED",
-    message: `${existing ? "Updated" : "New"}: ${offering.className} ${offering.subjectName} ${TERM_SCALE[termName].label}, ${input.title}`,
+    message: `New test: ${offering.className} ${offering.subjectName}, ${TERM_SCALE[termName].label}`,
     createdById: teacherId,
     classOfferingId: offering.classOfferingId,
   });
   return test.id;
+}
+
+export async function updateTest(teacherId: string, id: string, input: TestUpdate) {
+  const row = await ownedTest(teacherId, id);
+  await db.test.update({
+    where: { id },
+    data: {
+      deadlineDate: input.deadlineDate,
+    },
+  });
+  await notify({
+    type: "TEST_CHANGED",
+    message: `Updated test: ${row.offeringSubject.classOffering.schoolClass.name} ${row.offeringSubject.subject.name}, ${TERM_SCALE[row.term.name].label}`,
+    createdById: teacherId,
+    classOfferingId: row.offeringSubject.classOfferingId,
+  });
 }
 
 export async function gradeSubmission(teacherId: string, submissionId: string, input: GradeInput) {
@@ -390,7 +403,14 @@ export async function gradeSubmission(teacherId: string, submissionId: string, i
 
 export async function releaseGrades(teacherId: string, testId: string) {
   const test = await ownedTest(teacherId, testId);
-  const ungraded = await db.testSubmission.count({ where: { testId, marksObtained: null } });
+  const [expected, submissions] = await Promise.all([
+    db.enrollment.count({ where: { classOfferingId: test.offeringSubject.classOfferingId, status: "ENROLLED" } }),
+    db.testSubmission.findMany({ where: { testId }, select: { marksObtained: true } }),
+  ]);
+  const ungraded = submissions.filter((s) => s.marksObtained === null).length;
+  if (submissions.length < expected || ungraded > 0) {
+    throw new HttpError(409, "Release grades once every student has submitted and every answer has been graded.");
+  }
   const scale = TERM_SCALE[test.term.name];
   await notify({
     type: "GRADES_RELEASED",
@@ -413,10 +433,11 @@ export async function upsertSyllabus(teacherId: string, offeringSubjectId: strin
     where: { offeringSubjectId_termId: { offeringSubjectId: offering.id, termId: term.id } },
     select: { id: true },
   });
-  await db.syllabus.upsert({
+  const syllabus = await db.syllabus.upsert({
     where: { offeringSubjectId_termId: { offeringSubjectId: offering.id, termId: term.id } },
     update: { content, publishedById: teacherId },
     create: { offeringSubjectId: offering.id, termId: term.id, content, publishedById: teacherId },
+    select: { id: true },
   });
   await notify({
     type: "SYLLABUS_CHANGED",
@@ -424,6 +445,7 @@ export async function upsertSyllabus(teacherId: string, offeringSubjectId: strin
     createdById: teacherId,
     classOfferingId: offering.classOfferingId,
   });
+  return { id: syllabus.id };
 }
 
 export async function listTeacherSyllabus(teacherId: string | null) {
@@ -496,7 +518,6 @@ export async function listTeacherPending(teacherId: string) {
     })),
     tests: tests.filter((t) => t.ungradedCount > 0).map((t) => ({
       id: t.id,
-      title: t.title,
       subject: t.subject,
       className: t.className,
       termLabel: t.termLabel,

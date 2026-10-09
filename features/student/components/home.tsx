@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Alert, Button, Card, CardContent, Skeleton, Stack, Typography } from "@mui/material";
+import { Alert, Button, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from "@mui/material";
 import { formatDate } from "@/lib/format";
 import { usePending } from "../queries";
 
@@ -20,45 +20,69 @@ export function StudentHome() {
 
       {pending.data && (
         <>
-          <Section title="Homework">
-            {pending.data.homework.length === 0
-              ? <Typography color="text.secondary">All homework submitted.</Typography>
-              : pending.data.homework.map((h) => (
-                  <Item key={h.id} href={`/student/homework/${h.id}`} title={h.title} meta={`${h.subject} · due ${formatDate(h.deadlineDate)}`} />
-                ))}
-          </Section>
-          <Section title="Tests">
-            {pending.data.tests.length === 0
-              ? <Typography color="text.secondary">No pending tests.</Typography>
-              : pending.data.tests.map((t) => (
-                  <Item key={t.id} href={`/student/tests/${t.id}`} title={t.title} meta={`${t.subject} · ${t.termLabel} · out of ${t.max} · due ${formatDate(t.deadlineDate)}`} />
-                ))}
-          </Section>
+          <Stack spacing={1.5}>
+            <Typography variant="h3">Homework</Typography>
+            {pending.data.homework.length === 0 ? (
+              <Typography color="text.secondary">All homework submitted.</Typography>
+            ) : (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small" sx={{ "& th": { whiteSpace: "nowrap" } }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Title</TableCell>
+                      <TableCell>Subject</TableCell>
+                      <TableCell>Due</TableCell>
+                      <TableCell>Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {pending.data.homework.map((h) => (
+                      <TableRow key={h.id} hover>
+                        <TableCell sx={{ fontWeight: 700 }}>{h.title}</TableCell>
+                        <TableCell>{h.subject}</TableCell>
+                        <TableCell>{formatDate(h.deadlineDate)}</TableCell>
+                        <TableCell><Button component={Link} href={`/student/homework/${h.id}`} size="small" variant="outlined">Open</Button></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Stack>
+
+          <Stack spacing={1.5}>
+            <Typography variant="h3">Tests</Typography>
+            {pending.data.tests.length === 0 ? (
+              <Typography color="text.secondary">No pending tests.</Typography>
+            ) : (
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small" sx={{ "& th": { whiteSpace: "nowrap" } }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Subject</TableCell>
+                      <TableCell>Term</TableCell>
+                      <TableCell>Out of</TableCell>
+                      <TableCell>Due</TableCell>
+                      <TableCell>Action</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {pending.data.tests.map((t) => (
+                      <TableRow key={t.id} hover>
+                        <TableCell sx={{ fontWeight: 700 }}>{t.subject}</TableCell>
+                        <TableCell>{t.termLabel}</TableCell>
+                        <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{t.max}</TableCell>
+                        <TableCell>{formatDate(t.deadlineDate)}</TableCell>
+                        <TableCell><Button component={Link} href={`/student/tests/${t.id}`} size="small" variant="outlined">Open</Button></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Stack>
         </>
       )}
     </Stack>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Stack spacing={1.5}>
-      <Typography variant="h3">{title}</Typography>
-      {children}
-    </Stack>
-  );
-}
-
-function Item({ href, title, meta }: { href: string; title: string; meta: string }) {
-  return (
-    <Card>
-      <CardContent sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-        <Stack>
-          <Typography sx={{ fontWeight: 700 }}>{title}</Typography>
-          <Typography variant="body2" color="text.secondary">{meta}</Typography>
-        </Stack>
-        <Button component={Link} href={href} variant="outlined" size="small">Open</Button>
-      </CardContent>
-    </Card>
   );
 }

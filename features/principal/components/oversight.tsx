@@ -6,7 +6,7 @@ import { Alert, Card, CardContent, Chip, Paper, Skeleton, Stack, Table, TableBod
 import { apiRequest } from "@/lib/client-api";
 import type { TeacherHomeworkRow, TeacherTestRow, TeacherSyllabus } from "@/features/teacher/queries";
 import { formatDate } from "@/lib/format";
-import { SyllabusTable } from "@/components/syllabus-table";
+import { SyllabusTerms } from "@/components/syllabus-terms";
 
 function Loading() {
   return <Skeleton variant="rounded" height={200} />;
@@ -78,7 +78,6 @@ export function OversightTestList() {
                 <TableCell>Class</TableCell>
                 <TableCell>Subject</TableCell>
                 <TableCell>Term</TableCell>
-                <TableCell>Title</TableCell>
                 <TableCell>Teacher</TableCell>
                 <TableCell>Answered</TableCell>
                 <TableCell>To grade</TableCell>
@@ -89,9 +88,8 @@ export function OversightTestList() {
                 <TableRow key={t.id} hover>
                   <TableCell>{t.className}</TableCell>
                   <TableCell>{t.subject}</TableCell>
-                  <TableCell>{t.termLabel}</TableCell>
                   <TableCell>
-                    <Link href={`/principal/tests/${t.id}`} style={{ color: "inherit", fontWeight: 700, textDecoration: "none" }}>{t.title}</Link>
+                    <Link href={`/principal/tests/${t.id}`} style={{ color: "inherit", fontWeight: 700, textDecoration: "none" }}>{t.termLabel}</Link>
                   </TableCell>
                   <TableCell>{t.teacherName}</TableCell>
                   <TableCell sx={{ fontFamily: "var(--font-mono)" }}>{t.answeredCount}/{t.expectedCount}</TableCell>
@@ -122,7 +120,7 @@ export function OversightSyllabus() {
         <Card key={row.offeringSubjectId}>
           <CardContent>
             <Typography variant="h3" sx={{ mb: 2 }}>{row.className} · {row.subject}</Typography>
-            <SyllabusTable rows={row.terms.map((term) => ({ termLabel: term.termLabel, content: term.exists ? term.content : null, files: term.files }))} />
+            <SyllabusTerms rows={row.terms.map((term) => ({ termLabel: term.termLabel, content: term.exists ? term.content : null, files: term.files }))} />
           </CardContent>
         </Card>
       ))}
