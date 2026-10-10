@@ -146,11 +146,18 @@ export function StudentDetail({ id }: { id: string }) {
   const [name, setName] = useState<string | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   if (student.isPending) return <Skeleton variant="rounded" height={260} />;
   if (student.isError) return <Alert severity="error">{student.error.message}</Alert>;
   const s = student.data;
   const current = s.enrollments.find((e) => e.status === "ENROLLED" && e.sessionStatus === "ACTIVE");
+
+  function cancelEdit() {
+    setName(null);
+    setPhone(null);
+    setEditing(false);
+  }
 
   return (
     <Stack spacing={3}>
@@ -164,19 +171,40 @@ export function StudentDetail({ id }: { id: string }) {
 
       <Card>
         <CardContent>
-          <Typography variant="h3">Details</Typography>
-          <Stack spacing={2} sx={{ mt: 1, maxWidth: 440 }}>
-            <TextField label="Name" value={name ?? s.name} onChange={(e) => setName(e.target.value)} />
-            <TextField label="Phone number" value={phone ?? s.phoneNumber} onChange={(e) => setPhone(e.target.value)} />
-            <Button
-              variant="contained"
-              sx={{ alignSelf: "flex-start" }}
-              disabled={update.isPending}
-              onClick={() => update.mutate({ name: name ?? s.name, phoneNumber: phone ?? s.phoneNumber }, { onSuccess: () => setMessage("Details saved.") })}
-            >
-              Save details
-            </Button>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+            <Typography variant="h3">Details</Typography>
+            {!editing && <Button size="small" onClick={() => setEditing(true)}>Edit</Button>}
           </Stack>
+          {editing ? (
+            <Stack spacing={2} sx={{ mt: 1, maxWidth: 440 }}>
+              <TextField label="Name" value={name ?? s.name} onChange={(e) => setName(e.target.value)} />
+              <TextField label="Phone number" value={phone ?? s.phoneNumber} onChange={(e) => setPhone(e.target.value)} />
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="contained"
+                  disabled={update.isPending}
+                  onClick={() => update.mutate(
+                    { name: name ?? s.name, phoneNumber: phone ?? s.phoneNumber },
+                    { onSuccess: () => { setMessage("Details saved."); setEditing(false); } },
+                  )}
+                >
+                  Save details
+                </Button>
+                <Button variant="outlined" onClick={cancelEdit} disabled={update.isPending}>Cancel</Button>
+              </Stack>
+            </Stack>
+          ) : (
+            <Stack spacing={1.5} sx={{ mt: 1, maxWidth: 440 }}>
+              <Stack>
+                <Typography variant="caption" color="text.secondary">Name</Typography>
+                <Typography>{s.name}</Typography>
+              </Stack>
+              <Stack>
+                <Typography variant="caption" color="text.secondary">Phone number</Typography>
+                <Typography sx={{ fontFamily: "var(--font-mono)" }}>{s.phoneNumber}</Typography>
+              </Stack>
+            </Stack>
+          )}
         </CardContent>
       </Card>
 
@@ -192,7 +220,7 @@ export function StudentDetail({ id }: { id: string }) {
             {s.enrollments.length === 0 && <Typography color="text.secondary">Not enrolled yet.</Typography>}
           </Stack>
           {current && (
-            <Button color="error" sx={{ mt: 2 }} onClick={() => withdraw.mutate(current.id, { onSuccess: () => setMessage("Student withdrawn.") })} disabled={withdraw.isPending}>
+            <Button variant="outlined" color="error" sx={{ mt: 2 }} onClick={() => withdraw.mutate(current.id, { onSuccess: () => setMessage("Student withdrawn.") })} disabled={withdraw.isPending}>
               Withdraw from {current.className}
             </Button>
           )}

@@ -65,7 +65,10 @@ export async function getTeacher(id: string) {
   const row = await findTeacherRow(id);
   const assignments = await db.teacherAssignment.findMany({
     where: { teacherId: id },
-    orderBy: { offeringSubject: { subject: { name: "asc" } } },
+    orderBy: [
+      { offeringSubject: { classOffering: { schoolClass: { order: "asc" } } } },
+      { offeringSubject: { subject: { name: "asc" } } },
+    ],
     select: {
       offeringSubject: {
         select: {
@@ -88,6 +91,7 @@ export async function getTeacher(id: string) {
       offeringSubjectId: offeringSubject.id,
       subjectName: offeringSubject.subject.name,
       className: offeringSubject.classOffering.schoolClass.name,
+      classOrder: offeringSubject.classOffering.schoolClass.order,
       sessionLabel: offeringSubject.classOffering.academicSession.label,
       sessionStatus: offeringSubject.classOffering.academicSession.status,
     })),

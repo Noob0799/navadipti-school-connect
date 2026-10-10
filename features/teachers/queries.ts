@@ -17,6 +17,7 @@ export type TeacherDetail = TeacherSummary & {
     offeringSubjectId: string;
     subjectName: string;
     className: string;
+    classOrder: number;
     sessionLabel: string;
     sessionStatus: string;
   }[];

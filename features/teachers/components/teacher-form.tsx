@@ -11,9 +11,10 @@ type Props = {
   pending: boolean;
   error: string | null;
   onSubmit: (values: TeacherInput) => void;
+  onCancel?: () => void;
 };
 
-export function TeacherForm({ defaultValues, submitLabel, pending, error, onSubmit }: Props) {
+export function TeacherForm({ defaultValues, submitLabel, pending, error, onSubmit, onCancel }: Props) {
   const form = useForm<TeacherInput>({
     resolver: zodResolver(teacherInputSchema),
     defaultValues: { name: "", phoneNumber: "", employeeInfo: "", ...defaultValues },
@@ -45,9 +46,12 @@ export function TeacherForm({ defaultValues, submitLabel, pending, error, onSubm
           helperText={errors.employeeInfo?.message}
           {...form.register("employeeInfo")}
         />
-        <Button type="submit" variant="contained" disabled={pending} sx={{ alignSelf: "flex-start" }}>
-          {pending ? "Saving…" : submitLabel}
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button type="submit" variant="contained" disabled={pending}>
+            {pending ? "Saving…" : submitLabel}
+          </Button>
+          {onCancel && <Button variant="outlined" disabled={pending} onClick={onCancel}>Cancel</Button>}
+        </Stack>
       </Stack>
     </form>
   );
