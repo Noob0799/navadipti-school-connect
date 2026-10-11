@@ -379,7 +379,6 @@ async function seedRichCoursework(sessionId: string, studentsByClass: Map<string
 
 async function main() {
   await seedProductionPrincipal();
-  await seedDevAccounts();
 
   for (const name of SUBJECTS) {
     await prisma.subject.upsert({ where: { name }, update: {}, create: { name } });
@@ -396,6 +395,10 @@ async function main() {
   if (!(await prisma.academicSession.findFirst())) {
     await createSessionWithTemplate(prisma, "2026-27", "ACTIVE");
   }
+
+  // Subjects must exist before this, since it looks up subject IDs by name
+  // to seed each teacher's expertise.
+  await seedDevAccounts();
 
   const devPassword = process.env.SEED_DEV_PASSWORD;
   if (!devPassword) {
